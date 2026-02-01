@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>基金实时监控</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📈 基金实时监控</h1>
+            <p class="subtitle">追踪基金持仓股票实时走势</p>
+        </header>
+
+        <!-- 添加基金区域 -->
+        <div class="add-fund-section">
+            <div class="input-group">
+                <input
+                    type="text"
+                    id="fundCodeInput"
+                    placeholder="输入6位基金代码（如 000001）"
+                    maxlength="6"
+                    onkeypress="if(event.key === 'Enter') addFund()"
+                >
+                <button onclick="addFund()" class="btn btn-primary">添加基金</button>
+            </div>
+        </div>
+
+        <!-- 基金列表 -->
+        <div class="funds-container" id="fundsContainer">
+            <div class="loading">加载中...</div>
+        </div>
+
+        <!-- 提示信息 -->
+        <div class="info-section">
+            <h3>💡 使用说明</h3>
+            <ul>
+                <li>输入6位基金代码（如 000001），系统自动获取前十大重仓股</li>
+                <li>系统每5分钟自动更新一次数据</li>
+                <li>点击"查看走势"可查看今日分时走势图</li>
+                <li>点击"查看持仓"可查看前十大重仓股列表</li>
+            </ul>
+            <p class="note">注意：本应用仅计算基金股票部分的预估涨跌幅，不代表最终净值</p>
+        </div>
+    </div>
+
+    <!-- 持仓详情弹窗 -->
+    <div id="holdingModal" class="modal" onclick="closeModal('holdingModal')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <span class="close" onclick="closeModal('holdingModal')">&times;</span>
+            <h2 id="holdingTitle">基金持仓</h2>
+            <div id="holdingList" class="holding-list"></div>
+        </div>
+    </div>
+
+    <script>
+        // 页面加载时获取基金列表
+        document.addEventListener('DOMContentLoaded', function() {
+            loadFunds();
+            // 每60秒自动刷新一次
+            setInterval(loadFunds, 60000);
+        });
+
+        // 加载基金列表
+        async function loadFunds() {
+            try {
+                const response = await fetch('/api/funds');
+                const result = await response.json();
+
+                if (result.success) {
+                    renderFunds(result.data);
+                } else {
+                    showError(result.message);
+                }
+            } catch (error) {
+                console.error('加载基金列表失败:', error);
+                showError('加载失败，请刷新页面重试');
+            }
+        }
+
+        // 渲染基金列表
+        function renderFunds(funds) {
+            const container = document.getElementById('fundsContainer');
+
+            if (funds.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <p>暂无基金监控</p>
+                        <p class="hint">在上方输入基金代码开始监控</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = funds.map(fund => `
+                <div class="fund-card">
+                    <div class="fund-header">
+                        <div>
+                            <h3 class="fund-name">${fund.name}</h3>
+                            <p class="fund-code">代码: ${fund.code}</p>
+                        </div>
+                        <div class="fund-change ${fund.estimated_change >= 0 ? 'positive' : 'negative'}">
+                            ${fund.estimated_change !== null ?
+                                (fund.estimated_change >= 0 ? '+' : '') + fund.estimated_change + '%' :
+                                '等待数据...'}
+                        </div>
+                    </div>
+                    <div class="fund-actions">
+                        <button onclick="viewChart(${fund.id}, '${fund.name}', '${fund.code}')" class="btn btn-secondary">
+                            📊 查看走势
+                        </button>
+                        <button onclick="viewHoldings(${fund.id}, '${fund.name}')" class="btn btn-secondary">
+                            📋 查看持仓
+                        </button>
+                        <button onclick="deleteFund(${fund.id})" class="btn btn-danger">
+                            🗑️ 删除
+                        </button>
+                    </div>
+                    <p class="last-update">
+                        ${fund.last_update ? '更新: ' + fund.last_update : '等待首次更新...'}
+                    </p>
+                </div>
+            `).join('');
+        }
+
+        // 添加基金
+        async function addFund() {
+            const input = document.getElementById('fundCodeInput');
+            const code = input.value.trim();
+
+            if (!code || code.length !== 6 || !/^\d+$/.test(code)) {
+                alert('请输入6位数字基金代码');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/funds', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ code: code })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert(result.message);
+                    input.value = '';
+                    loadFunds();
+                } else {
+                    alert(result.message);
+                }
+            } catch (error) {
+                console.error('添加基金失败:', error);
+                alert('添加失败，请稍后重试');
+            }
+        }
+
+        // 删除基金
+        async function deleteFund(fundId) {
+            if (!confirm('确定要删除这个基金吗？')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/funds/${fundId}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert(result.message);
+                    loadFunds();
+                } else {
+                    alert(result.message);
+                }
+            } catch (error) {
+                console.error('删除基金失败:', error);
+                alert('删除失败，请稍后重试');
+            }
+        }
+
+        // 查看持仓详情
+        async function viewHoldings(fundId, fundName) {
+            try {
+                const response = await fetch(`/api/funds/${fundId}/holdings`);
+                const result = await response.json();
+
+                if (result.success) {
+                    document.getElementById('holdingTitle').textContent = `${fundName} - 前十大重仓股`;
+                    document.getElementById('holdingList').innerHTML = result.data.map(holding => `
+                        <div class="holding-item">
+                            <span class="stock-name">${holding.name}</span>
+                            <span class="stock-code">${holding.code}</span>
+                            <span class="stock-ratio">${holding.ratio}%</span>
+                        </div>
+                    `).join('');
+
+                    document.getElementById('holdingModal').style.display = 'block';
+                } else {
+                    alert(result.message);
+                }
+            } catch (error) {
+                console.error('获取持仓失败:', error);
+                alert('获取持仓失败，请稍后重试');
+            }
+        }
+
+        // 查看走势图
+        async function viewChart(fundId, fundName, fundCode) {
+            try {
+                const response = await fetch(`/api/funds/${fundId}/history`);
+                const result = await response.json();
+
+                if (result.success) {
+                    // 创建或更新图表窗口
+                    showChart(result.data, fundName, fundCode);
+                } else {
+                    alert(result.message);
+                }
+            } catch (error) {
+                console.error('获取历史数据失败:', error);
+                alert('获取历史数据失败，请稍后重试');
+            }
+        }
+
+        // 显示图表窗口
+        function showChart(data, fundName, fundCode) {
+            const chartWindow = window.open('', '_blank', 'width=800,height=600');
+            chartWindow.document.write(`
+                <!DOCTYPE html>
+                <html lang="zh-CN">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>${fundName} - 走势图</title>
+                    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+                    <style>
+                        body {
+                            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                            margin: 0;
+                            padding: 20px;
+                            background: #f5f5f5;
+                        }
+                        .chart-container {
+                            max-width: 900px;
+                            margin: 20px auto;
+                            background: white;
+                            padding: 30px;
+                            border-radius: 8px;
+                            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                        }
+                        h1 {
+                            text-align: center;
+                            color: #333;
+                            margin-bottom: 30px;
+                        }
+                        .info {
+                            text-align: center;
+                            color: #666;
+                            margin-bottom: 20px;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="chart-container">
+                        <h1>${fundName} (${fundCode})</h1>
+                        <p class="info">今日分时走势图（每5分钟更新）</p>
+                        <canvas id="chart"></canvas>
+                    </div>
+                    <script>
+                        const ctx = document.getElementById('chart').getContext('2d');
+                        new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: ${JSON.stringify(data.map(d => d.timestamp))},
+                                datasets: [{
+                                    label: '预估涨跌幅 (%)',
+                                    data: ${JSON.stringify(data.map(d => d.estimated_change))},
+                                    borderColor: function(context) {
+                                        const chart = context.chart;
+                                        const {ctx, chartArea} = chart;
+                                        if (!chartArea) return;
+                                        const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+                                        gradient.addColorStop(0, 'rgba(255, 99, 132, 1)');
+                                        gradient.addColorStop(0.5, 'rgba(75, 192, 192, 1)');
+                                        gradient.addColorStop(1, 'rgba(54, 162, 235, 1)');
+                                        return gradient;
+                                    },
+                                    backgroundColor: function(context) {
+                                        const chart = context.chart;
+                                        const {ctx, chartArea} = chart;
+                                        if (!chartArea) return;
+                                        const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+                                        gradient.addColorStop(0, 'rgba(255, 99, 132, 0.1)');
+                                        gradient.addColorStop(1, 'rgba(54, 162, 235, 0.1)');
+                                        return gradient;
+                                    },
+                                    borderWidth: 2,
+                                    fill: true,
+                                    tension: 0.4,
+                                    pointRadius: 3,
+                                    pointHoverRadius: 6
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: true,
+                                plugins: {
+                                    legend: {
+                                        display: true,
+                                        position: 'top'
+                                    },
+                                    tooltip: {
+                                        mode: 'index',
+                                        intersect: false
+                                    }
+                                },
+                                scales: {
+                                    x: {
+                                        title: {
+                                            display: true,
+                                            text: '时间'
+                                        }
+                                    },
+                                    y: {
+                                        title: {
+                                            display: true,
+                                            text: '涨跌幅 (%)'
+                                        },
+                                        grid: {
+                                            color: function(context) {
+                                                if (context.tick.value === 0) {
+                                                    return '#999';
+                                                }
+                                                return '#e0e0e0';
+                                            },
+                                            lineWidth: function(context) {
+                                                if (context.tick.value === 0) {
+                                                    return 2;
+                                                }
+                                                return 1;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    </script>
+                </body>
+                </html>
+            `);
+            chartWindow.document.close();
+        }
+
+        // 关闭弹窗
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        // 显示错误信息
+        function showError(message) {
+            const container = document.getElementById('fundsContainer');
+            container.innerHTML = `<div class="error">${message}</div>`;
+        }
+    </script>
+</body>
+</html>

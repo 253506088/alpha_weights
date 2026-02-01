@@ -1,0 +1,385 @@
+/* 基金实时监控样式表 */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    padding: 20px;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* 头部样式 */
+header {
+    text-align: center;
+    color: white;
+    margin-bottom: 40px;
+}
+
+header h1 {
+    font-size: 2.5em;
+    margin-bottom: 10px;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.subtitle {
+    font-size: 1.2em;
+    opacity: 0.9;
+}
+
+/* 添加基金区域 */
+.add-fund-section {
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    margin-bottom: 30px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.input-group {
+    display: flex;
+    gap: 10px;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+input[type="text"] {
+    flex: 1;
+    padding: 15px 20px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 16px;
+    transition: border-color 0.3s;
+}
+
+input[type="text"]:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+/* 按钮样式 */
+.btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.btn-secondary {
+    background: #f0f0f0;
+    color: #333;
+}
+
+.btn-secondary:hover {
+    background: #e0e0e0;
+}
+
+.btn-danger {
+    background: #ff4757;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #ff3838;
+}
+
+/* 基金列表容器 */
+.funds-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+/* 基金卡片 */
+.fund-card {
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.fund-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 12px rgba(0, 0, 0, 0.15);
+}
+
+.fund-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.fund-name {
+    font-size: 1.3em;
+    color: #333;
+    margin-bottom: 5px;
+}
+
+.fund-code {
+    color: #666;
+    font-size: 0.95em;
+}
+
+.fund-change {
+    font-size: 1.8em;
+    font-weight: 700;
+    padding: 10px 15px;
+    border-radius: 8px;
+    min-width: 120px;
+    text-align: center;
+}
+
+.fund-change.positive {
+    color: #2ecc71;
+    background: #d5f5e3;
+}
+
+.fund-change.negative {
+    color: #e74c3c;
+    background: #fadbd8;
+}
+
+.fund-actions {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.fund-actions .btn {
+    flex: 1;
+    padding: 10px;
+    font-size: 14px;
+}
+
+.last-update {
+    color: #999;
+    font-size: 0.85em;
+    text-align: center;
+}
+
+/* 空状态 */
+.empty-state {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 60px 20px;
+    background: white;
+    border-radius: 12px;
+    color: #999;
+}
+
+.empty-state p {
+    font-size: 1.2em;
+    margin-bottom: 10px;
+}
+
+.hint {
+    font-size: 0.9em;
+    color: #bbb;
+}
+
+/* 加载状态 */
+.loading {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 60px 20px;
+    background: white;
+    border-radius: 12px;
+    color: #666;
+    font-size: 1.2em;
+}
+
+/* 错误状态 */
+.error {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 40px 20px;
+    background: #ffe5e5;
+    border-radius: 12px;
+    color: #c0392b;
+}
+
+/* 信息区域 */
+.info-section {
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.info-section h3 {
+    color: #333;
+    margin-bottom: 15px;
+}
+
+.info-section ul {
+    list-style: none;
+    padding-left: 0;
+}
+
+.info-section li {
+    padding: 10px 0;
+    padding-left: 25px;
+    position: relative;
+    color: #555;
+}
+
+.info-section li:before {
+    content: "•";
+    position: absolute;
+    left: 0;
+    color: #667eea;
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+.note {
+    color: #f39c12;
+    font-size: 0.95em;
+    margin-top: 15px;
+    padding: 10px;
+    background: #fef9e7;
+    border-left: 4px solid #f39c12;
+    border-radius: 4px;
+}
+
+/* 弹窗样式 */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.modal-content {
+    background-color: white;
+    margin: 5% auto;
+    padding: 30px;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 600px;
+    position: relative;
+    animation: modalSlideIn 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-50px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: color 0.3s;
+}
+
+.close:hover {
+    color: #000;
+}
+
+.holding-list {
+    margin-top: 20px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.holding-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background-color 0.2s;
+}
+
+.holding-item:hover {
+    background-color: #f9f9f9;
+}
+
+.holding-item:last-child {
+    border-bottom: none;
+}
+
+.stock-name {
+    font-weight: 600;
+    color: #333;
+    flex: 2;
+}
+
+.stock-code {
+    color: #666;
+    flex: 1;
+    text-align: center;
+}
+
+.stock-ratio {
+    font-weight: 700;
+    color: #667eea;
+    flex: 1;
+    text-align: right;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    header h1 {
+        font-size: 2em;
+    }
+
+    .subtitle {
+        font-size: 1em;
+    }
+
+    .input-group {
+        flex-direction: column;
+    }
+
+    .funds-container {
+        grid-template-columns: 1fr;
+    }
+
+    .fund-actions {
+        flex-direction: column;
+    }
+
+    .fund-change {
+        font-size: 1.5em;
+        min-width: 100px;
+    }
+}
