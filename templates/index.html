@@ -73,6 +73,12 @@
 
         h1 {
             margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        h1 .title-text {
             font-size: 42px;
             font-weight: 700;
             background: linear-gradient(to right, #ffffff, #94a3b8);
@@ -414,8 +420,8 @@
 <body>
     <div id="app" class="container">
         <header>
-            <h1 style="display: flex; align-items: center; gap: 15px;">
-                基金估值看板
+            <h1>
+                <span class="title-text">基金估值看板</span>
                 <button class="refresh-btn" @click="showHelpModal = true">系统说明</button>
             </h1>
             <div class="input-group">
