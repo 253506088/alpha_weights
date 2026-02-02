@@ -66,6 +66,28 @@ def add_fund():
     finally:
         session.close()
 
+@app.route('/api/fund/delete', methods=['POST'])
+def delete_fund():
+    fund_id = request.json.get('id')
+    if not fund_id:
+        return jsonify({'success': False, 'message': '缺少基金ID'})
+    
+    session = get_session()
+    try:
+        fund = session.get(Fund, fund_id)
+        if not fund:
+            return jsonify({'success': False, 'message': '未找到该基金'})
+            
+        # 由于配置了 cascade="all, delete-orphan"，删除 Fund 会自动删除关联的 Holding 和 FundHistory
+        session.delete(fund)
+        session.commit()
+        return jsonify({'success': True, 'message': '删除成功'})
+    except Exception as e:
+        session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+    finally:
+        session.close()
+
 @app.route('/api/fund/refresh_holdings', methods=['POST'])
 def refresh_fund_holdings():
     """手动更新某个基金的持仓信息"""

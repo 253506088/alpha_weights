@@ -218,6 +218,21 @@
             color: var(--primary);
         }
 
+        .delete-btn {
+            background: none;
+            border: none;
+            color: #cbd5e1;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 0 5px;
+            margin-left: 10px;
+            line-height: 1;
+        }
+
+        .delete-btn:hover {
+            color: var(--red);
+        }
+
         /* Detail Table */
         .detail-table-container {
             margin-top: 20px;
@@ -276,6 +291,7 @@
                             <button class="icon-btn" @click.stop="refreshHoldings(fund)" title="重新获取持仓数据">更新持仓</button>
                         </div>
                     </div>
+                    <button class="delete-btn" @click.stop="deleteFund(fund)" title="删除基金">&times;</button>
                 </div>
                 <div :class="['value', getColorClass(fund.est_change)]">
                     [[ formatNumber(fund.est_change) ]]%
@@ -393,6 +409,23 @@
                                 this.triggerUpdate();
                             } else {
                                 alert(res.message);
+                            }
+                        });
+                },
+                deleteFund(fund) {
+                    if (!confirm(`确定要删除 ${fund.name} (${fund.code}) 吗？\n删除后历史数据也将被清除。`)) return;
+
+                    fetch('/api/fund/delete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: fund.id })
+                    })
+                        .then(r => r.json())
+                        .then(res => {
+                            if (res.success) {
+                                this.funds = this.funds.filter(f => f.id !== fund.id);
+                            } else {
+                                alert('删除失败: ' + res.message);
                             }
                         });
                 },
