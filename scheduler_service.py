@@ -24,29 +24,33 @@ def update_job():
     session = get_session()
     try:
         if is_trading:
-            print(f"[{now}] 交易时间，执行更新...")
+            print(f"[{now}] 交易时间，执行全量更新...")
             _perform_update(session)
         else:
             # 非交易时间
             if current_time > end_pm:
-                # 15:00 以后，检查今日是否已存档收盘数据
-                # 这里的逻辑是：如果今天(Now.date)已经有一条 15:00 之后的数据，就不再更新
+                # 15:00 以后，逐个检查基金是否已有今日收盘数据
+                all_funds = session.query(Fund).all()
+                target_funds = []
                 
-                # 获取数据库中最新的历史记录时间
-                last_record = session.query(FundHistory).order_by(FundHistory.timestamp.desc()).first()
+                # 构造今日15:00的时间点
+                close_time = datetime.combine(now.date(), end_pm)
                 
-                need_update = True
-                if last_record:
-                    is_today = last_record.timestamp.date() == now.date()
-                    is_after_close = last_record.timestamp.time() >= end_pm
-                    if is_today and is_after_close:
-                        need_update = False
+                for f in all_funds:
+                    # 检查该基金在收盘后是否有记录
+                    exists = session.query(FundHistory)\
+                        .filter(FundHistory.fund_id == f.id)\
+                        .filter(FundHistory.timestamp >= close_time)\
+                        .first()
+                    
+                    if not exists:
+                        target_funds.append(f)
                 
-                if need_update:
-                    print(f"[{now}] 收盘后补全收盘数据...")
-                    _perform_update(session)
+                if target_funds:
+                    print(f"[{now}] 发现 {len(target_funds)} 个基金需要补全收盘数据...")
+                    _perform_update(session, target_funds)
                 else:
-                    print(f"[{now}] 已有收盘数据，跳过更新.")
+                    print(f"[{now}] 所有基金已有收盘数据，跳过更新.")
             else:
                 # 9:30 之前或 11:30-13:00，跳过
                 print(f"[{now}] 非交易时间(盘前或午休)，跳过更新.")
@@ -56,10 +60,17 @@ def update_job():
     finally:
         session.close()
 
-def _perform_update(session: Session):
-    """执行具体的数据更新逻辑"""
-    # 1. 获取所有基金
-    funds = session.query(Fund).all()
+def _perform_update(session: Session, target_funds: list = None):
+    """
+    执行具体的数据更新逻辑
+    :param target_funds: 指定要更新的基金列表，如果为None则更新所有
+    """
+    # 1. 获取目标基金
+    if target_funds is None:
+        funds = session.query(Fund).all()
+    else:
+        funds = target_funds
+        
     if not funds:
         return
 
@@ -71,10 +82,8 @@ def _perform_update(session: Session):
         holdings = fund.holdings
         h_list = []
         for h in holdings:
-            # h.stock 是对象，我们需要 code
-            # 此时 h.stock 可能未加载（lazy loading），小心 N+1
-            # 只有当 h.stock_id 存在时
-            stock = session.query(Stock).get(h.stock_id)
+            # h.stock 可能未加载
+            stock = session.get(Stock, h.stock_id) # Replace query.get with session.get
             if stock:
                 all_stock_codes.add(stock.code)
                 h_list.append((stock.code, h.ratio))
@@ -109,11 +118,8 @@ def _perform_update(session: Session):
         )
         session.add(history)
     
-    # 5. 更新股票价格历史(可选，如果需要股票维度的历史)
-    # 鉴于需求主要看基金，这里可以简单只存，为了性能也可以不存，
-    # 但原来的models设计里有StockPrice，我们顺手存一下最新的
+    # 5. 更新股票价格历史 (只存本次涉及到的股票)
     for code, data in price_map.items():
-        # 找到stock对象
         stock = session.query(Stock).filter_by(code=code).first()
         if stock:
             sp = StockPrice(
@@ -126,7 +132,7 @@ def _perform_update(session: Session):
             session.add(sp)
             
     session.commit()
-    print("数据更新完成.")
+    print(f"为 {len(funds)} 个基金 更新数据完成.")
 
 def start_scheduler():
     init_db() # 确保库存在

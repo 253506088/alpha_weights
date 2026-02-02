@@ -2,7 +2,7 @@
 # Web 应用入口
 
 from flask import Flask, render_template, request, jsonify
-from models import get_session, Fund, Stock, Holding, FundHistory, init_db
+from models import get_session, Fund, Stock, Holding, FundHistory, StockPrice, init_db
 from fetcher import FundFetcher
 from scheduler_service import start_scheduler
 from datetime import datetime, date
@@ -76,7 +76,7 @@ def refresh_fund_holdings():
     try:
         fund = None
         if fund_id:
-            fund = session.query(Fund).get(fund_id)
+            fund = session.get(Fund, fund_id)
         elif code:
             fund = session.query(Fund).filter_by(code=code).first()
             
@@ -141,9 +141,16 @@ def get_fund_list():
             
             est_change = 0.0
             last_time = ""
+            last_timestamp = None
             if last_hist:
                 est_change = last_hist.estimated_change
                 last_time = last_hist.timestamp.strftime("%H:%M")
+                last_timestamp = last_hist.timestamp
+
+            # 检查是否过期，例如如果是昨天的，今天开盘前显示0？
+            # 暂时简单处理：如果是今天的数据才显示？或者一直显示最新一条
+            # 需求通常希望看到最新的有效状态。如果过了一夜，可能希望看到昨收盘？
+            # 既然有 update_time，前端自己判断
                 
             result.append({
                 'id': f.id,
@@ -165,6 +172,26 @@ def get_fund_history(fund_id):
         # Sqlite date compare needs care, try filtering by range
         start_of_day = datetime.combine(today, datetime.min.time())
         
+        # 1.获取基金和它的持仓结构
+        fund = session.get(Fund, fund_id)
+        if not fund:
+            return jsonify({'success': False, 'message': 'Fund not found'})
+            
+        # 预加载持仓，构建 stock_id -> {ratio, name} 映射
+        holdings_map = {}
+        for h in fund.holdings:
+            # 确保stock加载
+            s = session.get(Stock, h.stock_id) 
+            if s:
+                holdings_map[h.stock_id] = {
+                    'code': s.code,
+                    'name': s.name,
+                    'ratio': h.ratio
+                }
+        
+        stock_ids = list(holdings_map.keys())
+        
+        # 2. 获取基金估值历史
         histories = session.query(FundHistory)\
             .filter(FundHistory.fund_id == fund_id)\
             .filter(FundHistory.timestamp >= start_of_day)\
@@ -174,11 +201,54 @@ def get_fund_history(fund_id):
         times = [h.timestamp.strftime("%H:%M") for h in histories]
         values = [h.estimated_change for h in histories]
         
+        # 3. 获取对应的股票价格历史
+        # 为了避免查询过多，我们查询 stock_id在列表中，且时间在今天的
+        # 然后在内存里进行匹配
+        stock_prices = session.query(StockPrice)\
+            .filter(StockPrice.stock_id.in_(stock_ids))\
+            .filter(StockPrice.timestamp >= start_of_day)\
+            .all()
+            
+        # 将价格按 timestamp 分组: { timestamp_str: [price_record, ...] }
+        # 注意 timestamp 需要和 history 里的完全匹配，或者我们用 strftime 匹配
+        prices_by_time = {}
+        for sp in stock_prices:
+            t_str = sp.timestamp.strftime("%H:%M") # 分钟级匹配
+            if t_str not in prices_by_time:
+                prices_by_time[t_str] = []
+            prices_by_time[t_str].append(sp)
+            
+        # 4. 构建每个时间点的详情
+        details = []
+        for h in histories:
+            t_str = h.timestamp.strftime("%H:%M")
+            point_detail = []
+            
+            # 找到这个时间点的所有股票价格
+            sps = prices_by_time.get(t_str, [])
+            
+            for sp in sps:
+                # 找到这只股票在基金里的权重信息
+                h_info = holdings_map.get(sp.stock_id)
+                if h_info:
+                    point_detail.append({
+                        'code': h_info['code'],
+                        'name': h_info['name'],
+                        'ratio': h_info['ratio'],
+                        'pct': sp.change_percent,
+                        'price': sp.price
+                    })
+            
+            # 按权重排序
+            point_detail.sort(key=lambda x: x['ratio'], reverse=True)
+            details.append(point_detail)
+        
         return jsonify({
             'success': True,
             'data': {
                 'times': times,
-                'values': values
+                'values': values,
+                'details': details 
             }
         })
     finally:

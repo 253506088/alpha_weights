@@ -171,6 +171,8 @@
             border-radius: 16px;
             padding: 20px;
             position: relative;
+            max-height: 90vh;
+            overflow-y: auto;
         }
 
         .close-btn {
@@ -180,12 +182,13 @@
             font-size: 24px;
             cursor: pointer;
             color: var(--text-sub);
+            z-index: 10;
         }
 
         #chart {
             width: 100%;
-            height: 400px;
-            margin-top: 20px;
+            height: 350px;
+            margin-top: 10px;
         }
 
         .controls {
@@ -199,7 +202,6 @@
             padding: 5px 10px;
         }
 
-        /* New Icon Button Style */
         .icon-btn {
             background: none;
             border: 1px solid #cbd5e1;
@@ -214,6 +216,42 @@
         .icon-btn:hover {
             background: #e2e8f0;
             color: var(--primary);
+        }
+
+        /* Detail Table */
+        .detail-table-container {
+            margin-top: 20px;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 10px;
+        }
+
+        .detail-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .detail-table th,
+        .detail-table td {
+            padding: 8px;
+            text-align: right;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .detail-table th {
+            text-align: right;
+            color: var(--text-sub);
+            font-weight: normal;
+        }
+
+        .detail-table th:first-child,
+        .detail-table td:first-child {
+            text-align: left;
+        }
+
+        .detail-table small {
+            color: var(--text-sub);
+            margin-left: 5px;
         }
     </style>
 </head>
@@ -255,8 +293,38 @@
         <div class="modal-overlay" :class="{ active: showModal }" @click.self="closeModal">
             <div class="modal">
                 <div class="close-btn" @click="closeModal">&times;</div>
-                <h3 v-if="selectedFund">[[ selectedFund.name ]] ([[ selectedFund.code ]]) - 今日估值走势</h3>
+                <h3 v-if="selectedFund">[[ selectedFund.name ]] ([[ selectedFund.code ]])</h3>
                 <div id="chart"></div>
+
+                <div v-if="currentDetail && currentDetail.length > 0" class="detail-table-container">
+                    <h4>
+                        持仓详情
+                        <span style="font-weight:normal; font-size:14px; color:#64748b; margin-left:10px;">
+                            [[ currentDetailTime ]]
+                        </span>
+                    </h4>
+                    <table class="detail-table">
+                        <thead>
+                            <tr>
+                                <th>股票名称</th>
+                                <th>持仓占比</th>
+                                <th>价格</th>
+                                <th>今日涨跌</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="item in currentDetail" :key="item.code">
+                                <td>[[ item.name ]] <small>[[ item.code ]]</small></td>
+                                <td>[[ (item.ratio * 100).toFixed(2) ]]%</td>
+                                <td>[[ item.price ? item.price.toFixed(2) : '--' ]]</td>
+                                <td :class="getColorClass(item.pct)">[[ formatNumber(item.pct) ]]%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div v-else-if="selectedFund && chartLoaded" style="text-align:center; color:#94a3b8; padding:20px;">
+                    暂无该时间点的详细持仓数据
+                </div>
             </div>
         </div>
     </div>
@@ -271,7 +339,27 @@
                 loading: false,
                 showModal: false,
                 selectedFund: null,
-                chartInstance: null
+                chartInstance: null,
+
+                // Chart & Detail Data
+                selectedFundDetails: [], // 所有时间点的详情
+                selectedFundTimes: [],   // 所有时间点
+                currentPointIndex: -1,   // 当前选中的时间点索引
+                chartLoaded: false
+            },
+            computed: {
+                currentDetail() {
+                    if (this.currentPointIndex >= 0 && this.selectedFundDetails && this.selectedFundDetails[this.currentPointIndex]) {
+                        return this.selectedFundDetails[this.currentPointIndex];
+                    }
+                    return [];
+                },
+                currentDetailTime() {
+                    if (this.currentPointIndex >= 0 && this.selectedFundTimes && this.selectedFundTimes[this.currentPointIndex]) {
+                        return this.selectedFundTimes[this.currentPointIndex];
+                    }
+                    return '';
+                }
             },
             mounted() {
                 this.fetchList();
@@ -320,7 +408,7 @@
                         .then(res => {
                             if (res.success) {
                                 alert(res.message);
-                                this.triggerUpdate(); // 更新持仓后立即重新计算一次涨跌
+                                this.triggerUpdate();
                             } else {
                                 alert('更新失败: ' + res.message);
                             }
@@ -339,11 +427,17 @@
                     return 'neutral';
                 },
                 formatNumber(val) {
+                    if (val === undefined || val === null) return '--';
                     return (val > 0 ? '+' : '') + val.toFixed(2);
                 },
                 showChart(fund) {
                     this.selectedFund = fund;
                     this.showModal = true;
+                    this.chartLoaded = false;
+                    this.selectedFundDetails = [];
+                    this.selectedFundTimes = [];
+                    this.currentPointIndex = -1;
+
                     this.$nextTick(() => {
                         this.loadChart(fund.id);
                     });
@@ -359,7 +453,14 @@
                     fetch(`/api/fund/history/${fundId}`)
                         .then(r => r.json())
                         .then(res => {
+                            this.chartLoaded = true;
                             if (res.success && res.data) {
+                                this.selectedFundTimes = res.data.times;
+                                this.selectedFundDetails = res.data.details || [];
+                                // 默认选中最后一个点
+                                if (this.selectedFundTimes.length > 0) {
+                                    this.currentPointIndex = this.selectedFundTimes.length - 1;
+                                }
                                 this.renderChart(res.data.times, res.data.values);
                             }
                         });
@@ -367,10 +468,23 @@
                 renderChart(times, values) {
                     const dom = document.getElementById('chart');
                     this.chartInstance = echarts.init(dom);
+                    const self = this;
+
                     const option = {
                         tooltip: {
                             trigger: 'axis',
-                            formatter: '{b} <br/> 预估涨跌: {c}%'
+                            formatter: function (params) {
+                                if (params.length > 0) {
+                                    const index = params[0].dataIndex;
+                                    // 更新当前选中的索引，Vue会自动更新下方表格
+                                    self.currentPointIndex = index;
+
+                                    const date = params[0].name;
+                                    const val = params[0].value;
+                                    return `${date} <br/> 预估涨跌: ${val}%`;
+                                }
+                                return '';
+                            }
                         },
                         grid: { top: 30, bottom: 30, left: 40, right: 20 },
                         xAxis: {
