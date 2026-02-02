@@ -24,21 +24,51 @@ class FundFetcher:
         """
         print(f"\n[FundFetcher] 开始获取基金详情: {fund_code}")
         
-        # 1. 尝试 PC Web API
+        # 1. 尝试 PC Web API 获取持仓
+        data = None
         try:
             data = FundFetcher._fetch_from_pc_api(fund_code)
             if data and data.get('holdings'):
-                print(f"[FundFetcher] API (PC) 获取成功: {len(data['holdings'])} 只持仓")
-                return data
+                print(f"[FundFetcher] API (PC) 获取持仓成功: {len(data['holdings'])} 只股票")
         except Exception as e:
             print(f"[FundFetcher] PC API attempt failed for {fund_code}: {e}")
 
-        # 2. 如果失败，尝试最原始的方法（WEB Fallback）
-        try:
-            return FundFetcher._fetch_from_web_fallback(fund_code)
-        except Exception as e:
-            print(f"[FundFetcher] Web attempt failed for {fund_code}: {e}")
+        # 2. 如果API失败，尝试Fallback (虽然后来证明不好用，但留着也不坏)
+        if not data:
+            try:
+                data = FundFetcher._fetch_from_web_fallback(fund_code)
+            except Exception as e:
+                print(f"[FundFetcher] Web fallback attempt failed for {fund_code}: {e}")
+
+        if not data:
             return None
+
+        # 3. 尝试获取准确的基金名称 (如果是占位符的话)
+        if data['name'] == f"基金{fund_code}" or not data['name']:
+            real_name = FundFetcher._get_fund_name(fund_code)
+            if real_name:
+                print(f"[FundFetcher] 获取到真实名称: {real_name}")
+                data['name'] = real_name
+        
+        return data
+
+    @staticmethod
+    def _get_fund_name(fund_code: str) -> Optional[str]:
+        """
+        通过搜索接口获取准确的基金中文名称
+        """
+        url = "http://fundsuggest.eastmoney.com/FundSearch/api/FundSearchAPI.ashx"
+        params = {'m': '1', 'key': fund_code}
+        try:
+            resp = requests.get(url, params=params, headers=FundFetcher.HEADERS, timeout=5)
+            if resp.status_code == 200:
+                # 返回格式通常是 JSON: {"Datas": [{"CODE": "...", "NAME": "...", ...}], ...}
+                info = resp.json()
+                if 'Datas' in info and len(info['Datas']) > 0:
+                    return info['Datas'][0].get('NAME')
+        except Exception as e:
+            print(f"[FundFetcher] 获取名称失败: {e}")
+        return None
 
     @staticmethod
     def _fetch_from_pc_api(fund_code: str) -> Optional[Dict]:
