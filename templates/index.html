@@ -7,129 +7,200 @@
     <title>基金实时估值</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <!-- Font Awesome for icons if needed, using unicode for now or SVG in future. Keeping it simple. -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary: #2563eb;
-            --bg: #f8fafc;
-            --card-bg: #ffffff;
-            --text-main: #1e293b;
-            --text-sub: #64748b;
+            /* OpenClaw-inspired Dark Theme Palette */
+            --bg-dark: #02040a;
+            --bg-card: rgba(255, 255, 255, 0.03);
+            --bg-card-hover: rgba(255, 255, 255, 0.07);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --text-main: #ffffff;
+            --text-sub: #94a3b8;
+            --primary-gradient: linear-gradient(135deg, #ff5e3a 0%, #ff9500 100%);
+            --primary-text: #ff7e36;
+            --accent-glow: rgba(255, 94, 58, 0.3);
+
+            /* Status Colors */
             --red: #ef4444;
+            /* Fall/Lose */
             --green: #10b981;
-            --gray: #94a3b8;
+            /* Rise/Win */
+            --gray: #64748b;
         }
 
         body {
             margin: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: var(--bg);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-dark);
+            background-image:
+                radial-gradient(circle at 15% 50%, rgba(255, 94, 58, 0.08), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(37, 99, 235, 0.08), transparent 25%);
             color: var(--text-main);
+            min-height: 100vh;
         }
 
         .container {
-            max-width: 1000px;
+            max-width: 1200px;
             margin: 0 auto;
-            padding: 20px;
+            padding: 40px 20px;
         }
 
         header {
             display: flex;
-            justify-content: space-between;
+            flex-direction: column;
+            gap: 25px;
+            margin-bottom: 50px;
             align-items: center;
-            margin-bottom: 30px;
+            text-align: center;
         }
 
         h1 {
             margin: 0;
-            font-size: 24px;
+            font-size: 42px;
+            font-weight: 700;
+            background: linear-gradient(to right, #ffffff, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.02em;
         }
 
         .input-group {
             display: flex;
-            gap: 10px;
+            gap: 12px;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.03);
+            padding: 8px;
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            backdrop-filter: blur(10px);
         }
 
         input {
-            padding: 10px 15px;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
+            padding: 12px 20px;
+            background: transparent;
+            border: 1px solid transparent;
+            color: white;
+            font-size: 15px;
+            width: 240px;
+            border-radius: 10px;
             outline: none;
-            width: 200px;
+            transition: all 0.3s ease;
+        }
+
+        input:focus {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.2);
         }
 
         button {
-            padding: 10px 20px;
-            background: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 8px;
+            padding: 10px 24px;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
             cursor: pointer;
-            transition: opacity 0.2s;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-main);
         }
 
         button:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-1px);
+        }
+
+        /* Primary Action Buttons within input group */
+        .input-group button:last-child {
+            background: var(--primary-gradient);
+            border: none;
+            color: white;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        }
+
+        .input-group button:last-child:hover {
             opacity: 0.9;
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+
+        .refresh-btn {
+            font-size: 13px;
+            padding: 8px 16px;
         }
 
         .fund-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 24px;
         }
 
         .fund-card {
-            background: var(--card-bg);
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            position: relative;
             cursor: pointer;
-            transition: transform 0.2s;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(4px);
         }
 
         .fund-card:hover {
-            transform: translateY(-2px);
+            background: var(--bg-card-hover);
+            transform: translateY(-4px);
+            border-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5);
         }
 
         .card-header {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 10px;
+            margin-bottom: 20px;
+            align-items: flex-start;
         }
 
         .code {
             color: var(--text-sub);
-            font-size: 14px;
+            font-size: 13px;
             display: flex;
             align-items: center;
-            gap: 5px;
+            gap: 8px;
+            margin-top: 4px;
         }
 
         .name {
-            font-weight: bold;
-            font-size: 16px;
-            margin-bottom: 5px;
+            font-weight: 600;
+            font-size: 18px;
+            color: var(--text-main);
+            margin-bottom: 4px;
         }
 
         .value {
-            font-size: 32px;
-            font-weight: bold;
+            font-size: 42px;
+            font-weight: 700;
             display: flex;
             align-items: baseline;
+            letter-spacing: -1px;
+            margin: 15px 0;
         }
 
         .value small {
             font-size: 14px;
-            margin-left: 5px;
+            margin-left: 8px;
             color: var(--text-sub);
-            font-weight: normal;
+            font-weight: 500;
+            letter-spacing: 0;
         }
 
         .up {
             color: var(--red);
+            text-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
         }
 
         .down {
             color: var(--green);
+            text-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
         }
 
         .neutral {
@@ -139,24 +210,29 @@
         .time {
             font-size: 12px;
             color: var(--text-sub);
-            margin-top: 10px;
+            margin-top: 20px;
             text-align: right;
+            border-top: 1px solid var(--border-color);
+            padding-top: 12px;
+            opacity: 0.6;
         }
 
+        /* Modal Styles */
         .modal-overlay {
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
             display: flex;
             justify-content: center;
             align-items: center;
             z-index: 1000;
             opacity: 0;
             pointer-events: none;
-            transition: opacity 0.3s;
+            transition: all 0.3s;
         }
 
         .modal-overlay.active {
@@ -165,106 +241,97 @@
         }
 
         .modal {
-            background: white;
+            background: #0f111a;
             width: 90%;
             max-width: 1100px;
-            /* Increased width */
-            border-radius: 16px;
-            padding: 20px;
+            border-radius: 20px;
+            padding: 30px;
             position: relative;
             max-height: 90vh;
             overflow-y: auto;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+            color: var(--text-main);
         }
 
-        /* Modal Side-by-Side Layout */
         .modal-body {
             display: flex;
-            gap: 20px;
+            gap: 30px;
             align-items: flex-start;
         }
 
         .modal-left {
             flex: 1;
             min-width: 0;
-            /* Important for chart resizing */
         }
 
         .modal-right {
             width: 350px;
             flex-shrink: 0;
-            border-left: 1px solid #f1f5f9;
-            padding-left: 20px;
+            border-left: 1px solid var(--border-color);
+            padding-left: 30px;
         }
 
         .close-btn {
             position: absolute;
-            top: 15px;
-            right: 20px;
+            top: 25px;
+            right: 25px;
             font-size: 24px;
             cursor: pointer;
             color: var(--text-sub);
             z-index: 10;
+            transition: color 0.2s;
+        }
+
+        .close-btn:hover {
+            color: white;
         }
 
         #chart {
             width: 100%;
-            height: 550px;
-            /* Increased height */
+            height: 400px;
             margin-top: 10px;
         }
 
-        /* ... controls ... */
-
-        /* Detail Table */
         .detail-table-container {
             margin-top: 0;
             border-top: none;
             padding-top: 0;
-            max-height: 550px;
-            /* Increased height */
+            max-height: 600px;
             overflow-y: auto;
         }
 
-        /* ... */
-        .refresh-btn {
-            background: var(--text-sub);
-            font-size: 12px;
-            padding: 5px 10px;
-        }
-
         .icon-btn {
-            background: none;
-            border: 1px solid #cbd5e1;
+            background: transparent;
+            border: 1px solid var(--border-color);
             color: var(--text-sub);
-            border-radius: 4px;
-            padding: 0px 5px;
-            font-size: 12px;
+            border-radius: 6px;
+            padding: 2px 8px;
+            font-size: 11px;
             line-height: 1.5;
             cursor: pointer;
         }
 
         .icon-btn:hover {
-            background: #e2e8f0;
-            color: var(--primary);
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border-color: rgba(255, 255, 255, 0.3);
         }
 
         .delete-btn {
             background: none;
             border: none;
-            color: #cbd5e1;
-            font-size: 18px;
+            color: var(--text-sub);
+            font-size: 20px;
             cursor: pointer;
-            padding: 0 5px;
-            margin-left: 10px;
+            padding: 4px;
             line-height: 1;
+            transition: color 0.2s;
         }
 
         .delete-btn:hover {
             color: var(--red);
         }
-
-        /* Detail Table */
-
 
         .detail-table {
             width: 100%;
@@ -274,15 +341,19 @@
 
         .detail-table th,
         .detail-table td {
-            padding: 8px;
+            padding: 12px 8px;
             text-align: right;
-            border-bottom: 1px solid #f1f5f9;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-main);
         }
 
         .detail-table th {
             text-align: right;
             color: var(--text-sub);
-            font-weight: normal;
+            font-weight: 500;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
 
         .detail-table th:first-child,
@@ -290,9 +361,23 @@
             text-align: left;
         }
 
-        .detail-table small {
-            color: var(--text-sub);
-            margin-left: 5px;
+        /* Scrollbar styles */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
         }
     </style>
 </head>
@@ -300,9 +385,13 @@
 <body>
     <div id="app" class="container">
         <header>
-            <h1>监控基金前十大重仓股，预测今日基金净值涨跌幅 <button class="refresh-btn" style="vertical-align: middle; margin-left: 10px;"
-                    @click="showHelpModal = true">系统说明</button></h1>
+            <h1 style="display: flex; align-items: center; gap: 15px;">
+                基金估值看板
+                <button class="refresh-btn" @click="showHelpModal = true">系统说明</button>
+            </h1>
             <div class="input-group">
+                <button class="refresh-btn" @click="fetchList">刷新列表</button>
+                <button class="refresh-btn" @click="triggerUpdate">立即计算</button>
                 <input v-model="newFundCode" placeholder="输入6位基金代码 (如 000001)" @keyup.enter="addFund">
                 <button @click="addFund" :disabled="loading">[[ loading ? '添加中...' : '添加' ]]</button>
             </div>
@@ -313,24 +402,26 @@
             <div class="modal" style="max-width: 600px;">
                 <div class="close-btn" @click="showHelpModal = false">&times;</div>
                 <h3>系统逻辑说明</h3>
-                <div style="line-height: 1.6; color: #334155;">
-                    <p><strong>1. 核心原理</strong><br>
+                <div style="line-height: 1.8; color: var(--text-sub);">
+                    <p><strong style="color: var(--text-main)">1. 核心原理</strong><br>
                         本系统通过抓取基金的<b>前十大重仓股</b>及其<b>持仓占比</b>，结合这些股票的<b>实时涨跌幅</b>，来估算基金当天的实时净值变化。</p>
 
-                    <p><strong>2. 数据来源</strong><br>
+                    <p><strong style="color: var(--text-main)">2. 数据来源</strong><br>
                         - <b>基金持仓</b>：来自东方财富网 (PC端接口)，通常为最新季报数据。<br>
                         - <b>实时股价</b>：来自新浪财经 (High Frequency Interface)，每5分钟更新一次。</p>
 
-                    <p><strong>3. 更新机制</strong><br>
+                    <p><strong style="color: var(--text-main)">3. 更新机制</strong><br>
                         - <b>交易时间</b>：9:30~11:30, 13:00~15:00，每5分钟自动计算一次。<br>
                         - <b>收盘补全</b>：15:00 后会自动检查并补全当天的收盘数据。<br>
                         - <b>手动触发</b>：点击“立即触发后端计算”可强制立即运行一次计算逻辑。</p>
 
-                    <p><strong>4. 常用操作</strong><br>
+                    <p><strong style="color: var(--text-main)">4. 常用操作</strong><br>
                         - <b>更新持仓</b>：如果发现估值不准，可能是持仓数据滞后。点击卡片上的“更新持仓”可强制重新抓取最新的季报持仓。<br>
                         - <b>删除基金</b>：点击卡片右上角的 × 可删除基金及其历史数据。</p>
 
-                    <p style="color: #64748b; font-size: 12px; margin-top: 20px;">*
+                    <p
+                        style="color: var(--gray); font-size: 12px; margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+                        *
                         注意：估值仅供参考，实际净值请以基金公司官方公布为准。因只计算前十大重仓（通常占50%-70%仓位），与实际波动会有一定偏差。</p>
                 </div>
             </div>
@@ -356,15 +447,12 @@
             </div>
         </div>
 
-        <div class="controls">
-            <button class="refresh-btn" @click="fetchList">手动刷新列表</button>
-            <button class="refresh-btn" style="margin-left:10px" @click="triggerUpdate">立即触发后端计算</button>
-        </div>
-
         <div class="modal-overlay" :class="{ active: showModal }" @click.self="closeModal">
             <div class="modal">
                 <div class="close-btn" @click="closeModal">&times;</div>
-                <h3 v-if="selectedFund" style="margin-bottom: 20px;">[[ selectedFund.name ]] ([[ selectedFund.code ]])
+                <h3 v-if="selectedFund" style="margin-bottom: 20px;">[[ selectedFund.name ]] <span
+                        style="font-weight: normal; color: var(--text-sub); font-size: 16px;">([[ selectedFund.code
+                        ]])</span>
                 </h3>
 
                 <div class="modal-body">
@@ -375,9 +463,9 @@
                     <div class="modal-right">
                         <div v-if="currentDetail && currentDetail.length > 0" class="detail-table-container">
                             <h4
-                                style="margin-top: 0; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                                style="margin-top: 0; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; color: var(--text-sub); font-weight: 500;">
                                 持仓详情
-                                <span style="font-weight:normal; font-size:14px; color:#64748b;">
+                                <span style="font-weight:normal; font-size:12px; opacity: 0.7;">
                                     [[ currentDetailTime ]]
                                 </span>
                             </h4>
@@ -399,7 +487,7 @@
                             </table>
                         </div>
                         <div v-else-if="selectedFund && chartLoaded"
-                            style="text-align:center; color:#94a3b8; padding:20px;">
+                            style="text-align:center; color: var(--text-sub); padding:40px;">
                             暂无详情数据
                         </div>
                     </div>
@@ -568,8 +656,12 @@
                     const self = this;
 
                     const option = {
+                        backgroundColor: 'transparent',
                         tooltip: {
                             trigger: 'axis',
+                            backgroundColor: 'rgba(5, 5, 10, 0.9)',
+                            borderColor: '#333',
+                            textStyle: { color: '#fff' },
                             formatter: function (params) {
                                 if (params.length > 0) {
                                     const index = params[0].dataIndex;
@@ -583,16 +675,30 @@
                                 return '';
                             }
                         },
-                        grid: { top: 30, bottom: 30, left: 40, right: 20 },
+                        grid: {
+                            top: 40,
+                            bottom: 30,
+                            left: 50,
+                            right: 30,
+                            borderColor: 'rgba(255,255,255,0.1)'
+                        },
                         xAxis: {
                             type: 'category',
                             data: times,
-                            boundaryGap: false
+                            boundaryGap: false,
+                            axisLine: { lineStyle: { color: 'rgba(255,255,255,0.3)' } },
+                            axisLabel: { color: '#94a3b8' }
                         },
                         yAxis: {
                             type: 'value',
                             scale: true,
-                            axisLabel: { formatter: '{value}%' }
+                            axisLabel: {
+                                formatter: '{value}%',
+                                color: '#94a3b8'
+                            },
+                            splitLine: {
+                                lineStyle: { color: 'rgba(255,255,255,0.05)' }
+                            }
                         },
                         series: [{
                             data: values,
@@ -601,11 +707,11 @@
                             showSymbol: false,
                             areaStyle: {
                                 color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                                    { offset: 0, color: 'rgba(37, 99, 235, 0.2)' },
-                                    { offset: 1, color: 'rgba(37, 99, 235, 0)' }
+                                    { offset: 0, color: 'rgba(255, 94, 58, 0.2)' },
+                                    { offset: 1, color: 'rgba(255, 94, 58, 0)' }
                                 ])
                             },
-                            lineStyle: { width: 3, color: '#2563eb' }
+                            lineStyle: { width: 3, color: '#ff5e3a' }
                         }]
                     };
                     this.chartInstance.setOption(option);
