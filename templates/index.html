@@ -35,8 +35,23 @@
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background-color: var(--bg-dark);
             background-image:
-                radial-gradient(circle at 15% 50%, rgba(255, 94, 58, 0.08), transparent 25%),
-                radial-gradient(circle at 85% 30%, rgba(37, 99, 235, 0.08), transparent 25%);
+                /* 主光晕 (增强亮度和范围) */
+                radial-gradient(circle at 15% 50%, rgba(255, 94, 58, 0.15), transparent 35%),
+                radial-gradient(circle at 85% 30%, rgba(37, 99, 235, 0.15), transparent 35%),
+                /* 模拟星空 (细微的白点) */
+                radial-gradient(1px 1px at 10% 10%, rgba(255, 255, 255, 0.5) 50%, transparent),
+                radial-gradient(1px 1px at 20% 20%, rgba(255, 255, 255, 0.4) 50%, transparent),
+                radial-gradient(1px 1px at 30% 70%, rgba(255, 255, 255, 0.4) 50%, transparent),
+                radial-gradient(2px 2px at 40% 40%, rgba(255, 255, 255, 0.6) 50%, transparent),
+                radial-gradient(1px 1px at 50% 80%, rgba(255, 255, 255, 0.4) 50%, transparent),
+                radial-gradient(1px 1px at 60% 30%, rgba(255, 255, 255, 0.5) 50%, transparent),
+                radial-gradient(2px 2px at 70% 60%, rgba(255, 255, 255, 0.6) 50%, transparent),
+                radial-gradient(1px 1px at 80% 10%, rgba(255, 255, 255, 0.4) 50%, transparent),
+                radial-gradient(1px 1px at 90% 90%, rgba(255, 255, 255, 0.5) 50%, transparent);
+            background-size: 100% 100%, 100% 100%,
+                500px 500px, 400px 400px, 300px 300px, 600px 600px, 350px 350px, 450px 450px, 550px 550px, 250px 250px, 400px 400px;
+            background-position: 0 0, 0 0,
+                0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
             color: var(--text-main);
             min-height: 100vh;
         }
