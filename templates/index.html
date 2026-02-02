@@ -167,12 +167,33 @@
         .modal {
             background: white;
             width: 90%;
-            max-width: 800px;
+            max-width: 1100px;
+            /* Increased width */
             border-radius: 16px;
             padding: 20px;
             position: relative;
             max-height: 90vh;
             overflow-y: auto;
+        }
+
+        /* Modal Side-by-Side Layout */
+        .modal-body {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        .modal-left {
+            flex: 1;
+            min-width: 0;
+            /* Important for chart resizing */
+        }
+
+        .modal-right {
+            width: 350px;
+            flex-shrink: 0;
+            border-left: 1px solid #f1f5f9;
+            padding-left: 20px;
         }
 
         .close-btn {
@@ -187,15 +208,24 @@
 
         #chart {
             width: 100%;
-            height: 350px;
+            height: 550px;
+            /* Increased height */
             margin-top: 10px;
         }
 
-        .controls {
-            margin-top: 30px;
-            text-align: center;
+        /* ... controls ... */
+
+        /* Detail Table */
+        .detail-table-container {
+            margin-top: 0;
+            border-top: none;
+            padding-top: 0;
+            max-height: 550px;
+            /* Increased height */
+            overflow-y: auto;
         }
 
+        /* ... */
         .refresh-btn {
             background: var(--text-sub);
             font-size: 12px;
@@ -234,11 +264,7 @@
         }
 
         /* Detail Table */
-        .detail-table-container {
-            margin-top: 20px;
-            border-top: 1px solid #e2e8f0;
-            padding-top: 10px;
-        }
+
 
         .detail-table {
             width: 100%;
@@ -338,37 +364,45 @@
         <div class="modal-overlay" :class="{ active: showModal }" @click.self="closeModal">
             <div class="modal">
                 <div class="close-btn" @click="closeModal">&times;</div>
-                <h3 v-if="selectedFund">[[ selectedFund.name ]] ([[ selectedFund.code ]])</h3>
-                <div id="chart"></div>
+                <h3 v-if="selectedFund" style="margin-bottom: 20px;">[[ selectedFund.name ]] ([[ selectedFund.code ]])
+                </h3>
 
-                <div v-if="currentDetail && currentDetail.length > 0" class="detail-table-container">
-                    <h4>
-                        持仓详情
-                        <span style="font-weight:normal; font-size:14px; color:#64748b; margin-left:10px;">
-                            [[ currentDetailTime ]]
-                        </span>
-                    </h4>
-                    <table class="detail-table">
-                        <thead>
-                            <tr>
-                                <th>股票名称</th>
-                                <th>持仓占比</th>
-                                <th>价格</th>
-                                <th>今日涨跌</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="item in currentDetail" :key="item.code">
-                                <td>[[ item.name ]] <small>[[ item.code ]]</small></td>
-                                <td>[[ (item.ratio * 100).toFixed(2) ]]%</td>
-                                <td>[[ item.price ? item.price.toFixed(2) : '--' ]]</td>
-                                <td :class="getColorClass(item.pct)">[[ formatNumber(item.pct) ]]%</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                <div v-else-if="selectedFund && chartLoaded" style="text-align:center; color:#94a3b8; padding:20px;">
-                    暂无该时间点的详细持仓数据
+                <div class="modal-body">
+                    <div class="modal-left">
+                        <div id="chart"></div>
+                    </div>
+
+                    <div class="modal-right">
+                        <div v-if="currentDetail && currentDetail.length > 0" class="detail-table-container">
+                            <h4
+                                style="margin-top: 0; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                                持仓详情
+                                <span style="font-weight:normal; font-size:14px; color:#64748b;">
+                                    [[ currentDetailTime ]]
+                                </span>
+                            </h4>
+                            <table class="detail-table">
+                                <thead>
+                                    <tr>
+                                        <th>股票</th>
+                                        <th>占比</th>
+                                        <th>涨跌</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="item in currentDetail" :key="item.code">
+                                        <td>[[ item.name ]]</td>
+                                        <td>[[ (item.ratio * 100).toFixed(2) ]]%</td>
+                                        <td :class="getColorClass(item.pct)">[[ formatNumber(item.pct) ]]%</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div v-else-if="selectedFund && chartLoaded"
+                            style="text-align:center; color:#94a3b8; padding:20px;">
+                            暂无详情数据
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
