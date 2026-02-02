@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Alpha Weights - 基金实时估值</title>
+    <title>基金实时估值</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <style>
@@ -274,12 +274,41 @@
 <body>
     <div id="app" class="container">
         <header>
-            <h1>Alpha Weights 监控</h1>
+            <h1>监控基金前十大重仓股，预测今日基金净值涨跌幅 <button class="refresh-btn" style="vertical-align: middle; margin-left: 10px;"
+                    @click="showHelpModal = true">系统说明</button></h1>
             <div class="input-group">
                 <input v-model="newFundCode" placeholder="输入6位基金代码 (如 000001)" @keyup.enter="addFund">
                 <button @click="addFund" :disabled="loading">[[ loading ? '添加中...' : '添加' ]]</button>
             </div>
         </header>
+
+        <!-- Help Modal -->
+        <div class="modal-overlay" :class="{ active: showHelpModal }" @click.self="showHelpModal = false">
+            <div class="modal" style="max-width: 600px;">
+                <div class="close-btn" @click="showHelpModal = false">&times;</div>
+                <h3>系统逻辑说明</h3>
+                <div style="line-height: 1.6; color: #334155;">
+                    <p><strong>1. 核心原理</strong><br>
+                        本系统通过抓取基金的<b>前十大重仓股</b>及其<b>持仓占比</b>，结合这些股票的<b>实时涨跌幅</b>，来估算基金当天的实时净值变化。</p>
+
+                    <p><strong>2. 数据来源</strong><br>
+                        - <b>基金持仓</b>：来自东方财富网 (PC端接口)，通常为最新季报数据。<br>
+                        - <b>实时股价</b>：来自新浪财经 (High Frequency Interface)，每5分钟更新一次。</p>
+
+                    <p><strong>3. 更新机制</strong><br>
+                        - <b>交易时间</b>：9:30~11:30, 13:00~15:00，每5分钟自动计算一次。<br>
+                        - <b>收盘补全</b>：15:00 后会自动检查并补全当天的收盘数据。<br>
+                        - <b>手动触发</b>：点击“立即触发后端计算”可强制立即运行一次计算逻辑。</p>
+
+                    <p><strong>4. 常用操作</strong><br>
+                        - <b>更新持仓</b>：如果发现估值不准，可能是持仓数据滞后。点击卡片上的“更新持仓”可强制重新抓取最新的季报持仓。<br>
+                        - <b>删除基金</b>：点击卡片右上角的 × 可删除基金及其历史数据。</p>
+
+                    <p style="color: #64748b; font-size: 12px; margin-top: 20px;">*
+                        注意：估值仅供参考，实际净值请以基金公司官方公布为准。因只计算前十大重仓（通常占50%-70%仓位），与实际波动会有一定偏差。</p>
+                </div>
+            </div>
+        </div>
 
         <div class="fund-grid">
             <div class="fund-card" v-for="fund in funds" :key="fund.id" @click="showChart(fund)">
@@ -354,6 +383,7 @@
                 newFundCode: '',
                 loading: false,
                 showModal: false,
+                showHelpModal: false, // Help Modal State
                 selectedFund: null,
                 chartInstance: null,
 
