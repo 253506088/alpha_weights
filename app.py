@@ -1,283 +1,199 @@
-"""
-Flask 应用主程序
-"""
-from flask import Flask, render_template, jsonify, request
-from datetime import datetime, timedelta
+# app.py
+# Web 应用入口
 
-from models import init_db, get_session, Fund, Holding, Stock, FundHistory
-from api import FundDataFetcher, StockDataFetcher, calculate_fund_change
-from scheduler import start_scheduler
+from flask import Flask, render_template, request, jsonify
+from models import get_session, Fund, Stock, Holding, FundHistory, init_db
+from fetcher import FundFetcher
+from scheduler_service import start_scheduler
+from datetime import datetime, date
 
-# 创建Flask应用
 app = Flask(__name__)
-app.config['JSON_AS_ASCII'] = False
-
-
-# 初始化数据库
-try:
-    init_db()
-except Exception as e:
-    print(f"数据库初始化警告: {e}")
-
 
 # 启动定时任务
-try:
-    start_scheduler()
-except Exception as e:
-    print(f"定时任务启动警告: {e}")
-
+scheduler = start_scheduler()
 
 @app.route('/')
 def index():
-    """主页面"""
     return render_template('index.html')
 
-
-@app.route('/api/funds', methods=['GET'])
-def get_funds():
-    """获取所有基金列表"""
+@app.route('/api/fund/add', methods=['POST'])
+def add_fund():
+    code = request.json.get('code')
+    if not code or len(code) != 6:
+        return jsonify({'success': False, 'message': '请输入6位基金代码'})
+    
     session = get_session()
     try:
-        funds = session.query(Fund).order_by(Fund.created_at.desc()).all()
+        # 查重
+        exists = session.query(Fund).filter_by(code=code).first()
+        if exists:
+            return jsonify({'success': False, 'message': '该基金已存在'})
 
-        result = []
-        for fund in funds:
-            # 获取最新的历史数据
-            latest_history = session.query(FundHistory)\
-                .filter(FundHistory.fund_id == fund.id)\
-                .order_by(FundHistory.timestamp.desc())\
-                .first()
-
-            fund_info = {
-                'id': fund.id,
-                'code': fund.code,
-                'name': fund.name,
-                'created_at': fund.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-                'updated_at': fund.updated_at.strftime('%Y-%m-%d %H:%M:%S')
-            }
-
-            if latest_history:
-                fund_info['estimated_change'] = latest_history.estimated_change
-                fund_info['last_update'] = latest_history.timestamp.strftime('%Y-%m-%d %H:%M:%S')
-            else:
-                fund_info['estimated_change'] = None
-                fund_info['last_update'] = None
-
-            result.append(fund_info)
-
-        return jsonify({
-            'success': True,
-            'data': result
-        })
-
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'message': f'获取基金列表失败: {str(e)}'
-        })
-    finally:
-        session.close()
-
-
-@app.route('/api/funds', methods=['POST'])
-def add_fund():
-    """添加基金"""
-    try:
-        data = request.get_json()
-        fund_code = data.get('code', '').strip()
-
-        if not fund_code or len(fund_code) != 6 or not fund_code.isdigit():
-            return jsonify({
-                'success': False,
-                'message': '请输入6位数字基金代码'
-            })
-
-        session = get_session()
-
-        # 检查基金是否已存在
-        existing_fund = session.query(Fund).filter(Fund.code == fund_code).first()
-        if existing_fund:
-            return jsonify({
-                'success': False,
-                'message': f'基金 {fund_code} 已存在'
-            })
-
-        # 从东方财富获取基金持仓信息
-        fund_info = FundDataFetcher.get_fund_holdings(fund_code)
-
-        if not fund_info:
-            return jsonify({
-                'success': False,
-                'message': f'无法获取基金 {fund_code} 的信息，请检查基金代码'
-            })
-
-        # 创建基金记录
-        fund = Fund(
-            code=fund_info['code'],
-            name=fund_info['name']
-        )
+        # 获取数据
+        data = FundFetcher.get_fund_details(code)
+        if not data:
+            return jsonify({'success': False, 'message': '无法获取基金信息，请确认代码是否正确'})
+        
+        # 保存基金
+        fund = Fund(code=data['code'], name=data['name'])
         session.add(fund)
-        session.flush()  # 获取fund.id
-
-        # 创建持仓记录
-        for holding_data in fund_info['holdings']:
-            # 检查股票是否存在
-            stock = session.query(Stock).filter(Stock.code == holding_data['code']).first()
+        session.flush() # 获取ID
+        
+        # 保存持仓
+        for item in data['holdings']:
+            # item: {code, name, ratio}
+            stock_code = item['code']
+            stock_name = item['name']
+            ratio = item['ratio']
+            
+            # 查找或创建 Stock
+            stock = session.query(Stock).filter_by(code=stock_code).first()
             if not stock:
-                stock = Stock(
-                    code=holding_data['code'],
-                    name=holding_data['name']
-                )
+                stock = Stock(code=stock_code, name=stock_name)
                 session.add(stock)
                 session.flush()
-
-            # 创建持仓记录
-            holding = Holding(
-                fund_id=fund.id,
-                stock_id=stock.id,
-                ratio=holding_data['ratio']
-            )
+            
+            # 创建关联
+            holding = Holding(fund_id=fund.id, stock_id=stock.id, ratio=ratio)
             session.add(holding)
-
+            
         session.commit()
-
-        return jsonify({
-            'success': True,
-            'message': f'基金 {fund_info["name"]} 添加成功',
-            'data': {
-                'id': fund.id,
-                'code': fund.code,
-                'name': fund.name
-            }
-        })
-
+        return jsonify({'success': True, 'message': f"成功添加: {data['name']}"})
+        
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'message': f'添加基金失败: {str(e)}'
-        })
+        session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
     finally:
         session.close()
 
-
-@app.route('/api/funds/<int:fund_id>', methods=['DELETE'])
-def delete_fund(fund_id):
-    """删除基金"""
+@app.route('/api/fund/refresh_holdings', methods=['POST'])
+def refresh_fund_holdings():
+    """手动更新某个基金的持仓信息"""
+    fund_id = request.json.get('id')
+    code = request.json.get('code')
+    
     session = get_session()
     try:
-        fund = session.query(Fund).get(fund_id)
+        fund = None
+        if fund_id:
+            fund = session.query(Fund).get(fund_id)
+        elif code:
+            fund = session.query(Fund).filter_by(code=code).first()
+            
         if not fund:
-            return jsonify({
-                'success': False,
-                'message': '基金不存在'
-            })
-
-        fund_code = fund.code
-        fund_name = fund.name
-
-        session.delete(fund)
-        session.commit()
-
-        return jsonify({
-            'success': True,
-            'message': f'基金 {fund_name} ({fund_code}) 已删除'
-        })
+            return jsonify({'success': False, 'message': '未找到该基金'})
+            
+        # 重新获取数据
+        print(f"正在重新获取基金 {fund.code} 的持仓...")
+        data = FundFetcher.get_fund_details(fund.code)
+        if not data:
+            return jsonify({'success': False, 'message': '无法从外部接口获取数据'})
+            
+        # 更新名称
+        if data.get('name') and data['name'] != f"基金{fund.code}":
+            fund.name = data['name']
+            
+        # 只有当抓取到持仓时才更新
+        if data.get('holdings'):
+             # 清除旧持仓
+            session.query(Holding).filter_by(fund_id=fund.id).delete()
+            
+            # 写入新持仓
+            for item in data['holdings']:
+                stock_code = item['code']
+                stock_name = item['name']
+                ratio = item['ratio']
+                
+                # 查找或创建 Stock
+                stock = session.query(Stock).filter_by(code=stock_code).first()
+                if not stock:
+                    stock = Stock(code=stock_code, name=stock_name)
+                    session.add(stock)
+                    session.flush()
+                
+                # 创建关联
+                holding = Holding(fund_id=fund.id, stock_id=stock.id, ratio=ratio)
+                session.add(holding)
+            
+            session.commit()
+            return jsonify({'success': True, 'message': f"成功更新持仓，共 {len(data['holdings'])} 只股票"})
+        else:
+            return jsonify({'success': False, 'message': '接口返回的持仓列表为空，未进行更新'})
 
     except Exception as e:
         session.rollback()
-        return jsonify({
-            'success': False,
-            'message': f'删除基金失败: {str(e)}'
-        })
+        return jsonify({'success': False, 'message': str(e)})
     finally:
         session.close()
 
-
-@app.route('/api/funds/<int:fund_id>/history')
-def get_fund_history(fund_id):
-    """获取基金历史数据（用于绘制走势图）"""
+@app.route('/api/fund/list', methods=['GET'])
+def get_fund_list():
     session = get_session()
     try:
-        fund = session.query(Fund).get(fund_id)
-        if not fund:
-            return jsonify({
-                'success': False,
-                'message': '基金不存在'
+        funds = session.query(Fund).all()
+        result = []
+        for f in funds:
+            # 获取最新估值
+            last_hist = session.query(FundHistory)\
+                .filter_by(fund_id=f.id)\
+                .order_by(FundHistory.timestamp.desc())\
+                .first()
+            
+            est_change = 0.0
+            last_time = ""
+            if last_hist:
+                est_change = last_hist.estimated_change
+                last_time = last_hist.timestamp.strftime("%H:%M")
+                
+            result.append({
+                'id': f.id,
+                'code': f.code,
+                'name': f.name,
+                'est_change': est_change,
+                'update_time': last_time
             })
+        return jsonify({'success': True, 'data': result})
+    finally:
+        session.close()
 
-        # 获取今天的历史数据
-        today = datetime.now().date()
-        start_time = datetime.combine(today, datetime.min.time())
-
+@app.route('/api/fund/history/<int:fund_id>', methods=['GET'])
+def get_fund_history(fund_id):
+    session = get_session()
+    try:
+        # 只取当天的
+        today = date.today()
+        # Sqlite date compare needs care, try filtering by range
+        start_of_day = datetime.combine(today, datetime.min.time())
+        
         histories = session.query(FundHistory)\
             .filter(FundHistory.fund_id == fund_id)\
-            .filter(FundHistory.timestamp >= start_time)\
+            .filter(FundHistory.timestamp >= start_of_day)\
             .order_by(FundHistory.timestamp.asc())\
             .all()
-
-        result = []
-        for history in histories:
-            result.append({
-                'timestamp': history.timestamp.strftime('%H:%M:%S'),
-                'estimated_change': history.estimated_change
-            })
-
+            
+        times = [h.timestamp.strftime("%H:%M") for h in histories]
+        values = [h.estimated_change for h in histories]
+        
         return jsonify({
             'success': True,
-            'data': result,
-            'fund_name': fund.name,
-            'fund_code': fund.code
-        })
-
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'message': f'获取历史数据失败: {str(e)}'
+            'data': {
+                'times': times,
+                'values': values
+            }
         })
     finally:
         session.close()
 
-
-@app.route('/api/funds/<int:fund_id>/holdings')
-def get_fund_holdings(fund_id):
-    """获取基金持仓详情"""
-    session = get_session()
+@app.route('/api/trigger', methods=['POST'])
+def manual_trigger():
+    # 手动触发更新（调试用）
+    from scheduler_service import update_job
     try:
-        fund = session.query(Fund).get(fund_id)
-        if not fund:
-            return jsonify({
-                'success': False,
-                'message': '基金不存在'
-            })
-
-        holdings = session.query(Holding).filter(Holding.fund_id == fund_id).all()
-
-        result = []
-        for holding in holdings:
-            stock = session.query(Stock).get(holding.stock_id)
-            if stock:
-                result.append({
-                    'code': stock.code,
-                    'name': stock.name,
-                    'ratio': round(holding.ratio * 100, 2)  # 转换为百分比
-                })
-
-        # 按持仓占比降序排序
-        result.sort(key=lambda x: x['ratio'], reverse=True)
-
-        return jsonify({
-            'success': True,
-            'data': result
-        })
-
+        update_job()
+        return jsonify({'success': True, 'message': '已触发更新'})
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'message': f'获取持仓数据失败: {str(e)}'
-        })
-    finally:
-        session.close()
-
+        return jsonify({'success': False, 'message': str(e)})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # 纯本地使用，开启debug方便看日志
+    app.run(host='0.0.0.0', port=5000, debug=False)

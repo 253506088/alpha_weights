@@ -1,371 +1,407 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>基金实时监控</title>
-    <link rel="stylesheet" href="/static/css/style.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>Alpha Weights - 基金实时估值</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-sub: #64748b;
+            --red: #ef4444;
+            --green: #10b981;
+            --gray: #94a3b8;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg);
+            color: var(--text-main);
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        input {
+            padding: 10px 15px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            outline: none;
+            width: 200px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        .fund-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .fund-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .fund-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .code {
+            color: var(--text-sub);
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .name {
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+
+        .value {
+            font-size: 32px;
+            font-weight: bold;
+            display: flex;
+            align-items: baseline;
+        }
+
+        .value small {
+            font-size: 14px;
+            margin-left: 5px;
+            color: var(--text-sub);
+            font-weight: normal;
+        }
+
+        .up {
+            color: var(--red);
+        }
+
+        .down {
+            color: var(--green);
+        }
+
+        .neutral {
+            color: var(--gray);
+        }
+
+        .time {
+            font-size: 12px;
+            color: var(--text-sub);
+            margin-top: 10px;
+            text-align: right;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal {
+            background: white;
+            width: 90%;
+            max-width: 800px;
+            border-radius: 16px;
+            padding: 20px;
+            position: relative;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-sub);
+        }
+
+        #chart {
+            width: 100%;
+            height: 400px;
+            margin-top: 20px;
+        }
+
+        .controls {
+            margin-top: 30px;
+            text-align: center;
+        }
+
+        .refresh-btn {
+            background: var(--text-sub);
+            font-size: 12px;
+            padding: 5px 10px;
+        }
+
+        /* New Icon Button Style */
+        .icon-btn {
+            background: none;
+            border: 1px solid #cbd5e1;
+            color: var(--text-sub);
+            border-radius: 4px;
+            padding: 0px 5px;
+            font-size: 12px;
+            line-height: 1.5;
+            cursor: pointer;
+        }
+
+        .icon-btn:hover {
+            background: #e2e8f0;
+            color: var(--primary);
+        }
+    </style>
 </head>
+
 <body>
-    <div class="container">
+    <div id="app" class="container">
         <header>
-            <h1>📈 基金实时监控</h1>
-            <p class="subtitle">追踪基金持仓股票实时走势</p>
+            <h1>Alpha Weights 监控</h1>
+            <div class="input-group">
+                <input v-model="newFundCode" placeholder="输入6位基金代码 (如 000001)" @keyup.enter="addFund">
+                <button @click="addFund" :disabled="loading">[[ loading ? '添加中...' : '添加' ]]</button>
+            </div>
         </header>
 
-        <!-- 添加基金区域 -->
-        <div class="add-fund-section">
-            <div class="input-group">
-                <input
-                    type="text"
-                    id="fundCodeInput"
-                    placeholder="输入6位基金代码（如 000001）"
-                    maxlength="6"
-                    onkeypress="if(event.key === 'Enter') addFund()"
-                >
-                <button onclick="addFund()" class="btn btn-primary">添加基金</button>
+        <div class="fund-grid">
+            <div class="fund-card" v-for="fund in funds" :key="fund.id" @click="showChart(fund)">
+                <div class="card-header">
+                    <div>
+                        <div class="name">[[ fund.name ]]</div>
+                        <div class="code">
+                            [[ fund.code ]]
+                            <button class="icon-btn" @click.stop="refreshHoldings(fund)" title="重新获取持仓数据">更新持仓</button>
+                        </div>
+                    </div>
+                </div>
+                <div :class="['value', getColorClass(fund.est_change)]">
+                    [[ formatNumber(fund.est_change) ]]%
+                    <small>预估</small>
+                </div>
+                <div class="time">更新于: [[ fund.update_time || '--:--' ]]</div>
             </div>
         </div>
 
-        <!-- 基金列表 -->
-        <div class="funds-container" id="fundsContainer">
-            <div class="loading">加载中...</div>
+        <div class="controls">
+            <button class="refresh-btn" @click="fetchList">手动刷新列表</button>
+            <button class="refresh-btn" style="margin-left:10px" @click="triggerUpdate">立即触发后端计算</button>
         </div>
 
-        <!-- 提示信息 -->
-        <div class="info-section">
-            <h3>💡 使用说明</h3>
-            <ul>
-                <li>输入6位基金代码（如 000001），系统自动获取前十大重仓股</li>
-                <li>系统每5分钟自动更新一次数据</li>
-                <li>点击"查看走势"可查看今日分时走势图</li>
-                <li>点击"查看持仓"可查看前十大重仓股列表</li>
-            </ul>
-            <p class="note">注意：本应用仅计算基金股票部分的预估涨跌幅，不代表最终净值</p>
-        </div>
-    </div>
-
-    <!-- 持仓详情弹窗 -->
-    <div id="holdingModal" class="modal" onclick="closeModal('holdingModal')">
-        <div class="modal-content" onclick="event.stopPropagation()">
-            <span class="close" onclick="closeModal('holdingModal')">&times;</span>
-            <h2 id="holdingTitle">基金持仓</h2>
-            <div id="holdingList" class="holding-list"></div>
+        <div class="modal-overlay" :class="{ active: showModal }" @click.self="closeModal">
+            <div class="modal">
+                <div class="close-btn" @click="closeModal">&times;</div>
+                <h3 v-if="selectedFund">[[ selectedFund.name ]] ([[ selectedFund.code ]]) - 今日估值走势</h3>
+                <div id="chart"></div>
+            </div>
         </div>
     </div>
 
     <script>
-        // 页面加载时获取基金列表
-        document.addEventListener('DOMContentLoaded', function() {
-            loadFunds();
-            // 每60秒自动刷新一次
-            setInterval(loadFunds, 60000);
-        });
-
-        // 加载基金列表
-        async function loadFunds() {
-            try {
-                const response = await fetch('/api/funds');
-                const result = await response.json();
-
-                if (result.success) {
-                    renderFunds(result.data);
-                } else {
-                    showError(result.message);
-                }
-            } catch (error) {
-                console.error('加载基金列表失败:', error);
-                showError('加载失败，请刷新页面重试');
-            }
-        }
-
-        // 渲染基金列表
-        function renderFunds(funds) {
-            const container = document.getElementById('fundsContainer');
-
-            if (funds.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <p>暂无基金监控</p>
-                        <p class="hint">在上方输入基金代码开始监控</p>
-                    </div>
-                `;
-                return;
-            }
-
-            container.innerHTML = funds.map(fund => `
-                <div class="fund-card">
-                    <div class="fund-header">
-                        <div>
-                            <h3 class="fund-name">${fund.name}</h3>
-                            <p class="fund-code">代码: ${fund.code}</p>
-                        </div>
-                        <div class="fund-change ${fund.estimated_change >= 0 ? 'positive' : 'negative'}">
-                            ${fund.estimated_change !== null ?
-                                (fund.estimated_change >= 0 ? '+' : '') + fund.estimated_change + '%' :
-                                '等待数据...'}
-                        </div>
-                    </div>
-                    <div class="fund-actions">
-                        <button onclick="viewChart(${fund.id}, '${fund.name}', '${fund.code}')" class="btn btn-secondary">
-                            📊 查看走势
-                        </button>
-                        <button onclick="viewHoldings(${fund.id}, '${fund.name}')" class="btn btn-secondary">
-                            📋 查看持仓
-                        </button>
-                        <button onclick="deleteFund(${fund.id})" class="btn btn-danger">
-                            🗑️ 删除
-                        </button>
-                    </div>
-                    <p class="last-update">
-                        ${fund.last_update ? '更新: ' + fund.last_update : '等待首次更新...'}
-                    </p>
-                </div>
-            `).join('');
-        }
-
-        // 添加基金
-        async function addFund() {
-            const input = document.getElementById('fundCodeInput');
-            const code = input.value.trim();
-
-            if (!code || code.length !== 6 || !/^\d+$/.test(code)) {
-                alert('请输入6位数字基金代码');
-                return;
-            }
-
-            try {
-                const response = await fetch('/api/funds', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ code: code })
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    alert(result.message);
-                    input.value = '';
-                    loadFunds();
-                } else {
-                    alert(result.message);
-                }
-            } catch (error) {
-                console.error('添加基金失败:', error);
-                alert('添加失败，请稍后重试');
-            }
-        }
-
-        // 删除基金
-        async function deleteFund(fundId) {
-            if (!confirm('确定要删除这个基金吗？')) {
-                return;
-            }
-
-            try {
-                const response = await fetch(`/api/funds/${fundId}`, {
-                    method: 'DELETE'
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    alert(result.message);
-                    loadFunds();
-                } else {
-                    alert(result.message);
-                }
-            } catch (error) {
-                console.error('删除基金失败:', error);
-                alert('删除失败，请稍后重试');
-            }
-        }
-
-        // 查看持仓详情
-        async function viewHoldings(fundId, fundName) {
-            try {
-                const response = await fetch(`/api/funds/${fundId}/holdings`);
-                const result = await response.json();
-
-                if (result.success) {
-                    document.getElementById('holdingTitle').textContent = `${fundName} - 前十大重仓股`;
-                    document.getElementById('holdingList').innerHTML = result.data.map(holding => `
-                        <div class="holding-item">
-                            <span class="stock-name">${holding.name}</span>
-                            <span class="stock-code">${holding.code}</span>
-                            <span class="stock-ratio">${holding.ratio}%</span>
-                        </div>
-                    `).join('');
-
-                    document.getElementById('holdingModal').style.display = 'block';
-                } else {
-                    alert(result.message);
-                }
-            } catch (error) {
-                console.error('获取持仓失败:', error);
-                alert('获取持仓失败，请稍后重试');
-            }
-        }
-
-        // 查看走势图
-        async function viewChart(fundId, fundName, fundCode) {
-            try {
-                const response = await fetch(`/api/funds/${fundId}/history`);
-                const result = await response.json();
-
-                if (result.success) {
-                    // 创建或更新图表窗口
-                    showChart(result.data, fundName, fundCode);
-                } else {
-                    alert(result.message);
-                }
-            } catch (error) {
-                console.error('获取历史数据失败:', error);
-                alert('获取历史数据失败，请稍后重试');
-            }
-        }
-
-        // 显示图表窗口
-        function showChart(data, fundName, fundCode) {
-            const chartWindow = window.open('', '_blank', 'width=800,height=600');
-            chartWindow.document.write(`
-                <!DOCTYPE html>
-                <html lang="zh-CN">
-                <head>
-                    <meta charset="UTF-8">
-                    <title>${fundName} - 走势图</title>
-                    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-                    <style>
-                        body {
-                            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-                            margin: 0;
-                            padding: 20px;
-                            background: #f5f5f5;
-                        }
-                        .chart-container {
-                            max-width: 900px;
-                            margin: 20px auto;
-                            background: white;
-                            padding: 30px;
-                            border-radius: 8px;
-                            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-                        }
-                        h1 {
-                            text-align: center;
-                            color: #333;
-                            margin-bottom: 30px;
-                        }
-                        .info {
-                            text-align: center;
-                            color: #666;
-                            margin-bottom: 20px;
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="chart-container">
-                        <h1>${fundName} (${fundCode})</h1>
-                        <p class="info">今日分时走势图（每5分钟更新）</p>
-                        <canvas id="chart"></canvas>
-                    </div>
-                    <script>
-                        const ctx = document.getElementById('chart').getContext('2d');
-                        new Chart(ctx, {
-                            type: 'line',
-                            data: {
-                                labels: ${JSON.stringify(data.map(d => d.timestamp))},
-                                datasets: [{
-                                    label: '预估涨跌幅 (%)',
-                                    data: ${JSON.stringify(data.map(d => d.estimated_change))},
-                                    borderColor: function(context) {
-                                        const chart = context.chart;
-                                        const {ctx, chartArea} = chart;
-                                        if (!chartArea) return;
-                                        const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
-                                        gradient.addColorStop(0, 'rgba(255, 99, 132, 1)');
-                                        gradient.addColorStop(0.5, 'rgba(75, 192, 192, 1)');
-                                        gradient.addColorStop(1, 'rgba(54, 162, 235, 1)');
-                                        return gradient;
-                                    },
-                                    backgroundColor: function(context) {
-                                        const chart = context.chart;
-                                        const {ctx, chartArea} = chart;
-                                        if (!chartArea) return;
-                                        const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
-                                        gradient.addColorStop(0, 'rgba(255, 99, 132, 0.1)');
-                                        gradient.addColorStop(1, 'rgba(54, 162, 235, 0.1)');
-                                        return gradient;
-                                    },
-                                    borderWidth: 2,
-                                    fill: true,
-                                    tension: 0.4,
-                                    pointRadius: 3,
-                                    pointHoverRadius: 6
-                                }]
-                            },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: true,
-                                plugins: {
-                                    legend: {
-                                        display: true,
-                                        position: 'top'
-                                    },
-                                    tooltip: {
-                                        mode: 'index',
-                                        intersect: false
-                                    }
-                                },
-                                scales: {
-                                    x: {
-                                        title: {
-                                            display: true,
-                                            text: '时间'
-                                        }
-                                    },
-                                    y: {
-                                        title: {
-                                            display: true,
-                                            text: '涨跌幅 (%)'
-                                        },
-                                        grid: {
-                                            color: function(context) {
-                                                if (context.tick.value === 0) {
-                                                    return '#999';
-                                                }
-                                                return '#e0e0e0';
-                                            },
-                                            lineWidth: function(context) {
-                                                if (context.tick.value === 0) {
-                                                    return 2;
-                                                }
-                                                return 1;
-                                            }
-                                        }
-                                    }
-                                }
+        new Vue({
+            el: '#app',
+            delimiters: ['[[', ']]'],
+            data: {
+                funds: [],
+                newFundCode: '',
+                loading: false,
+                showModal: false,
+                selectedFund: null,
+                chartInstance: null
+            },
+            mounted() {
+                this.fetchList();
+                setInterval(this.fetchList, 60000);
+            },
+            methods: {
+                fetchList() {
+                    fetch('/api/fund/list')
+                        .then(r => r.json())
+                        .then(res => {
+                            if (res.success) {
+                                this.funds = res.data;
                             }
                         });
-                    </script>
-                </body>
-                </html>
-            `);
-            chartWindow.document.close();
-        }
+                },
+                addFund() {
+                    if (!this.newFundCode) return;
+                    this.loading = true;
+                    fetch('/api/fund/add', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ code: this.newFundCode })
+                    })
+                        .then(r => r.json())
+                        .then(res => {
+                            this.loading = false;
+                            if (res.success) {
+                                alert('添加成功');
+                                this.newFundCode = '';
+                                this.fetchList();
+                                this.triggerUpdate();
+                            } else {
+                                alert(res.message);
+                            }
+                        });
+                },
+                refreshHoldings(fund) {
+                    if (!confirm(`确定要重新获取 ${fund.name} (${fund.code}) 的持仓信息吗？`)) return;
 
-        // 关闭弹窗
-        function closeModal(modalId) {
-            document.getElementById(modalId).style.display = 'none';
-        }
-
-        // 显示错误信息
-        function showError(message) {
-            const container = document.getElementById('fundsContainer');
-            container.innerHTML = `<div class="error">${message}</div>`;
-        }
+                    fetch('/api/fund/refresh_holdings', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: fund.id, code: fund.code })
+                    })
+                        .then(r => r.json())
+                        .then(res => {
+                            if (res.success) {
+                                alert(res.message);
+                                this.triggerUpdate(); // 更新持仓后立即重新计算一次涨跌
+                            } else {
+                                alert('更新失败: ' + res.message);
+                            }
+                        });
+                },
+                triggerUpdate() {
+                    fetch('/api/trigger', { method: 'POST' })
+                        .then(r => r.json())
+                        .then(res => {
+                            setTimeout(this.fetchList, 2000);
+                        });
+                },
+                getColorClass(val) {
+                    if (val > 0) return 'up';
+                    if (val < 0) return 'down';
+                    return 'neutral';
+                },
+                formatNumber(val) {
+                    return (val > 0 ? '+' : '') + val.toFixed(2);
+                },
+                showChart(fund) {
+                    this.selectedFund = fund;
+                    this.showModal = true;
+                    this.$nextTick(() => {
+                        this.loadChart(fund.id);
+                    });
+                },
+                closeModal() {
+                    this.showModal = false;
+                    if (this.chartInstance) {
+                        this.chartInstance.dispose();
+                        this.chartInstance = null;
+                    }
+                },
+                loadChart(fundId) {
+                    fetch(`/api/fund/history/${fundId}`)
+                        .then(r => r.json())
+                        .then(res => {
+                            if (res.success && res.data) {
+                                this.renderChart(res.data.times, res.data.values);
+                            }
+                        });
+                },
+                renderChart(times, values) {
+                    const dom = document.getElementById('chart');
+                    this.chartInstance = echarts.init(dom);
+                    const option = {
+                        tooltip: {
+                            trigger: 'axis',
+                            formatter: '{b} <br/> 预估涨跌: {c}%'
+                        },
+                        grid: { top: 30, bottom: 30, left: 40, right: 20 },
+                        xAxis: {
+                            type: 'category',
+                            data: times,
+                            boundaryGap: false
+                        },
+                        yAxis: {
+                            type: 'value',
+                            scale: true,
+                            axisLabel: { formatter: '{value}%' }
+                        },
+                        series: [{
+                            data: values,
+                            type: 'line',
+                            smooth: true,
+                            showSymbol: false,
+                            areaStyle: {
+                                color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                                    { offset: 0, color: 'rgba(37, 99, 235, 0.2)' },
+                                    { offset: 1, color: 'rgba(37, 99, 235, 0)' }
+                                ])
+                            },
+                            lineStyle: { width: 3, color: '#2563eb' }
+                        }]
+                    };
+                    this.chartInstance.setOption(option);
+                }
+            }
+        });
     </script>
 </body>
+
 </html>

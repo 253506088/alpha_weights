@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+
+# Database and Data
+data/
+*.db
+*.sqlite
+
+# Backup
+_backup/
+
+# Logs
+*.log
+
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+
+# Temporary Test Scripts
+test_*.py
+
+# OS
+.DS_Store
+Thumbs.db
