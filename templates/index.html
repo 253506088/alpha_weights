@@ -242,15 +242,7 @@
             color: var(--gray) !important;
         }
 
-        .time {
-            font-size: 12px;
-            color: var(--text-sub);
-            margin-top: 20px;
-            text-align: right;
-            border-top: 1px solid var(--border-color);
-            padding-top: 12px;
-            opacity: 0.6;
-        }
+
 
         /* Modal Styles */
         .modal-overlay {
@@ -437,6 +429,39 @@
             color: white;
             opacity: 1;
         }
+
+        .card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+            border-top: 1px solid var(--border-color);
+            padding-top: 12px;
+        }
+
+        .total-ratio {
+            font-size: 12px;
+            color: var(--text-sub);
+            display: flex;
+            align-items: center;
+        }
+
+        .total-ratio::before {
+            content: '';
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+            border-radius: 50%;
+            margin-right: 6px;
+            opacity: 0.8;
+        }
+
+        .time {
+            font-size: 12px;
+            color: var(--text-sub);
+            opacity: 0.6;
+        }
     </style>
 </head>
 
@@ -502,7 +527,12 @@
                     [[ formatNumber(fund.est_change) ]]%
                     <small>预估</small>
                 </div>
-                <div class="time">更新于: [[ fund.update_time || '--:--' ]]</div>
+                <div class="card-footer">
+                    <div class="total-ratio" title="前十持仓占比">
+                        前十仓位: [[ fund.total_ratio ? (fund.total_ratio * 100).toFixed(2) : '--' ]]%
+                    </div>
+                    <div class="time">更新于: [[ fund.update_time || '--:--' ]]</div>
+                </div>
             </div>
         </div>
 

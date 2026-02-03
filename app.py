@@ -173,14 +173,16 @@ def get_fund_list():
             # 检查是否过期，例如如果是昨天的，今天开盘前显示0？
             # 暂时简单处理：如果是今天的数据才显示？或者一直显示最新一条
             # 需求通常希望看到最新的有效状态。如果过了一夜，可能希望看到昨收盘？
-            # 既然有 update_time，前端自己判断
-                
+            # 计算前十持仓总占比
+            total_ratio = sum([h.ratio for h in f.holdings])
+
             result.append({
                 'id': f.id,
                 'code': f.code,
                 'name': f.name,
                 'est_change': est_change,
-                'update_time': last_time
+                'update_time': last_time,
+                'total_ratio': total_ratio
             })
         return jsonify({'success': True, 'data': result})
     finally:
