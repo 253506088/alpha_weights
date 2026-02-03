@@ -91,6 +91,14 @@ class StockPrice(Base):
     
     stock = relationship("Stock", back_populates="prices")
 
+class SystemConfig(Base):
+    """系统配置表"""
+    __tablename__ = 'system_config'
+
+    key = Column(String(50), primary_key=True)
+    value = Column(String(200), nullable=False)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
 def init_db():
     """初始化数据库表结构"""
     Base.metadata.create_all(engine)

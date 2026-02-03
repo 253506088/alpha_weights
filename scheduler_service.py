@@ -5,8 +5,12 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime
 import time
 from sqlalchemy.orm import Session
-from models import get_session, Fund, Stock, Holding, FundHistory, StockPrice, init_db
+from sqlalchemy.orm import Session
+from models import get_session, Fund, Stock, Holding, FundHistory, StockPrice, SystemConfig, init_db
 from fetcher import StockFetcher
+
+_scheduler_instance = None
+DEFAULT_INTERVAL = 5
 
 def update_job():
     """核数据更新任务"""
@@ -135,9 +139,57 @@ def _perform_update(session: Session, target_funds: list = None):
     print(f"为 {len(funds)} 个基金 更新数据完成.")
 
 def start_scheduler():
+    global _scheduler_instance
     init_db() # 确保库存在
+    
+    # 从数据库读取配置
+    interval = DEFAULT_INTERVAL
+    session = get_session()
+    try:
+        config = session.query(SystemConfig).filter_by(key='update_interval').first()
+        if config:
+            try:
+                interval = int(config.value)
+                if interval < 1: interval = 1
+            except: pass
+    finally:
+        session.close()
+            
+    print(f"启动定时任务，当前间隔: {interval} 分钟")
+
     scheduler = BackgroundScheduler()
     # 每5分钟执行一次
-    scheduler.add_job(update_job, 'interval', minutes=5, next_run_time=datetime.now())
+    scheduler.add_job(update_job, 'interval', minutes=interval, id='update_job', next_run_time=datetime.now())
     scheduler.start()
+    
+    _scheduler_instance = scheduler
     return scheduler
+
+def change_interval(minutes: int):
+    """修改定时任务间隔"""
+    global _scheduler_instance
+    if not _scheduler_instance:
+        return False, "Scheduler not running"
+    
+    if minutes < 1:
+        minutes = 1
+        
+    try:
+        _scheduler_instance.reschedule_job('update_job', trigger='interval', minutes=minutes)
+        
+        # 持久化
+        session = get_session()
+        try:
+            config = session.query(SystemConfig).filter_by(key='update_interval').first()
+            if not config:
+                config = SystemConfig(key='update_interval', value=str(minutes))
+                session.add(config)
+            else:
+                config.value = str(minutes)
+            session.commit()
+        finally:
+            session.close()
+            
+        return True, f"已调整更新频率为 {minutes} 分钟/次"
+    except Exception as e:
+        return False, str(e)

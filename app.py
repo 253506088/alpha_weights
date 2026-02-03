@@ -3,6 +3,7 @@
 
 from flask import Flask, render_template, request, jsonify
 from models import get_session, Fund, Stock, Holding, FundHistory, StockPrice, init_db
+import models
 from fetcher import FundFetcher
 from scheduler_service import start_scheduler
 from datetime import datetime, date
@@ -283,6 +284,35 @@ def manual_trigger():
     try:
         update_job()
         return jsonify({'success': True, 'message': '已触发更新'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/config', methods=['GET'])
+def get_config():
+    session = get_session()
+    try:
+        config = session.query(models.SystemConfig).filter_by(key='update_interval').first()
+        interval = 5
+        if config:
+            try:
+                interval = int(config.value)
+            except: pass
+        return jsonify({'success': True, 'data': {'interval': interval}})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+    finally:
+        session.close()
+
+@app.route('/api/config/update', methods=['POST'])
+def update_config():
+    minutes = request.json.get('interval')
+    if not minutes or int(minutes) < 1:
+        return jsonify({'success': False, 'message': '间隔必须大于等于1分钟'})
+        
+    from scheduler_service import change_interval
+    try:
+        success, msg = change_interval(int(minutes))
+        return jsonify({'success': success, 'message': msg})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
 
