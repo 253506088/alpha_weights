@@ -8,6 +8,8 @@ conda activate alpha_weights
 # 安装依赖
 cd D:\code\my\1\alpha_weights\alpha_weights
 pip install -r requirements.txt
+
+
 python app.py
 ```
 
