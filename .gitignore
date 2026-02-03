@@ -10,6 +10,9 @@ data/
 # Backup
 _backup/
 
+# 构建。
+build/
+
 # Logs
 *.log
 

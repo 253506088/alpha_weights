@@ -15,6 +15,8 @@ class FundFetcher:
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
         'Referer': 'http://fundf10.eastmoney.com/'
     }
+    # 强制不使用系统代理，避免用户电脑上有残留的代理设置导致连接 127.0.0.1 失败
+    PROXIES = {"http": None, "https": None}
 
     @staticmethod
     def get_fund_details(fund_code: str) -> Optional[Dict]:
@@ -60,7 +62,7 @@ class FundFetcher:
         url = "http://fundsuggest.eastmoney.com/FundSearch/api/FundSearchAPI.ashx"
         params = {'m': '1', 'key': fund_code}
         try:
-            resp = requests.get(url, params=params, headers=FundFetcher.HEADERS, timeout=5)
+            resp = requests.get(url, params=params, headers=FundFetcher.HEADERS, proxies=FundFetcher.PROXIES, timeout=5)
             if resp.status_code == 200:
                 # 返回格式通常是 JSON: {"Datas": [{"CODE": "...", "NAME": "...", ...}], ...}
                 info = resp.json()
@@ -88,7 +90,7 @@ class FundFetcher:
         
         print(f"  [API REQ] GET {url}")
         
-        resp = requests.get(url, params=params, headers=FundFetcher.HEADERS, timeout=8)
+        resp = requests.get(url, params=params, headers=FundFetcher.HEADERS, proxies=FundFetcher.PROXIES, timeout=8)
         resp.encoding = 'utf-8'
         
         print(f"  [API RES] Status: {resp.status_code}")
@@ -190,7 +192,7 @@ class FundFetcher:
         url = f"http://fundf10.eastmoney.com/ccmx_{fund_code}.html"
         print(f"  [WEB REQ] GET {url}")
         try:
-            resp = requests.get(url, headers=FundFetcher.HEADERS, timeout=8)
+            resp = requests.get(url, headers=FundFetcher.HEADERS, proxies=FundFetcher.PROXIES, timeout=8)
             resp.encoding = 'utf-8'
             tree = html.fromstring(resp.text)
             
@@ -249,7 +251,8 @@ class StockFetcher:
         print(f"  [STOCK REQ] GET {url}")
         
         try:
-            resp = requests.get(url, headers=headers, timeout=10)
+            # 同样禁用代理
+            resp = requests.get(url, headers=headers, proxies={"http": None, "https": None}, timeout=10)
             resp.encoding = 'gbk' 
             
             print(f"  [STOCK RES] Status: {resp.status_code}")

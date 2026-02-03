@@ -5,11 +5,19 @@ from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, cre
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 from datetime import datetime
 import os
+import sys
 
 Base = declarative_base()
 
 # 数据库路径：data/fund_monitor.db
-DB_DIR = os.path.join(os.path.dirname(__file__), 'data')
+if getattr(sys, 'frozen', False):
+    # 如果是打包后的 exe，使用 exe 所在目录作为基准，确保数据持久化
+    BASE_DIR = os.path.dirname(sys.executable)
+else:
+    # 正常开发环境
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+DB_DIR = os.path.join(BASE_DIR, 'data')
 DB_PATH = os.path.join(DB_DIR, 'fund_monitor.db')
 
 # 确保data目录存在
