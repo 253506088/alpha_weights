@@ -414,6 +414,29 @@
         ::-webkit-scrollbar-thumb:hover {
             background: rgba(255, 255, 255, 0.2);
         }
+
+        .footer {
+            text-align: center;
+            margin-top: 60px;
+            padding-bottom: 20px;
+            color: var(--text-sub);
+            font-size: 14px;
+            opacity: 0.8;
+        }
+
+        .footer a {
+            color: var(--text-sub);
+            text-decoration: none;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .footer a:hover {
+            color: white;
+            opacity: 1;
+        }
     </style>
 </head>
 
@@ -529,6 +552,11 @@
                 </div>
             </div>
         </div>
+        <footer class="footer">
+            <a href="https://github.com/253506088/alpha_weights" target="_blank">
+                GitHub
+            </a>
+        </footer>
     </div>
 
     <script>
