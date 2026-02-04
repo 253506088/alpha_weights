@@ -9,8 +9,10 @@ from sqlalchemy.orm import Session
 from models import get_session, Fund, Stock, Holding, FundHistory, StockPrice, SystemConfig, init_db
 from fetcher import StockFetcher
 
+from log_utils import log
+
 _scheduler_instance = None
-DEFAULT_INTERVAL = 5
+DEFAULT_INTERVAL = 60 # seconds
 
 def update_job():
     """核数据更新任务"""
@@ -28,7 +30,7 @@ def update_job():
     session = get_session()
     try:
         if is_trading:
-            print(f"[{now}] 交易时间，执行全量更新...")
+            log("交易时间，执行全量更新...")
             _perform_update(session)
         else:
             # 非交易时间
@@ -51,16 +53,16 @@ def update_job():
                         target_funds.append(f)
                 
                 if target_funds:
-                    print(f"[{now}] 发现 {len(target_funds)} 个基金需要补全收盘数据...")
+                    log(f"发现 {len(target_funds)} 个基金需要补全收盘数据...")
                     _perform_update(session, target_funds)
                 else:
-                    print(f"[{now}] 所有基金已有收盘数据，跳过更新.")
+                    log("所有基金已有收盘数据，跳过更新.")
             else:
                 # 9:30 之前或 11:30-13:00，跳过
-                print(f"[{now}] 非交易时间(盘前或午休)，跳过更新.")
+                log("非交易时间(盘前或午休)，跳过更新.")
                 
     except Exception as e:
-        print(f"定时任务异常: {e}")
+        log(f"定时任务异常: {e}")
     finally:
         session.close()
 
@@ -136,7 +138,7 @@ def _perform_update(session: Session, target_funds: list = None):
             session.add(sp)
             
     session.commit()
-    print(f"为 {len(funds)} 个基金 更新数据完成.")
+    log(f"为 {len(funds)} 个基金 更新数据完成.")
 
 def start_scheduler():
     global _scheduler_instance
@@ -149,47 +151,55 @@ def start_scheduler():
         config = session.query(SystemConfig).filter_by(key='update_interval').first()
         if config:
             try:
-                interval = int(config.value)
-                if interval < 1: interval = 1
+                val = int(config.value)
+                # 迁移逻辑：如果值很小（例如 < 30），认为是旧的分钟单位，自动转换为秒
+                if val < 30:
+                    val = val * 60
+                
+                interval = val
             except: pass
     finally:
         session.close()
             
-    print(f"启动定时任务，当前间隔: {interval} 分钟")
+    # 安全兜底
+    if interval < 30:
+        interval = 30
+            
+    log(f"启动定时任务，当前间隔: {interval} 秒")
 
     scheduler = BackgroundScheduler()
-    # 每5分钟执行一次
-    scheduler.add_job(update_job, 'interval', minutes=interval, id='update_job', next_run_time=datetime.now())
+    # 改为 seconds
+    scheduler.add_job(update_job, 'interval', seconds=interval, id='update_job', next_run_time=datetime.now())
     scheduler.start()
     
     _scheduler_instance = scheduler
     return scheduler
 
-def change_interval(minutes: int):
+def change_interval(seconds: int):
     """修改定时任务间隔"""
     global _scheduler_instance
     if not _scheduler_instance:
         return False, "Scheduler not running"
     
-    if minutes < 1:
-        minutes = 1
+    if seconds < 30:
+        seconds = 30
         
     try:
-        _scheduler_instance.reschedule_job('update_job', trigger='interval', minutes=minutes)
+        _scheduler_instance.reschedule_job('update_job', trigger='interval', seconds=seconds)
         
         # 持久化
         session = get_session()
         try:
             config = session.query(SystemConfig).filter_by(key='update_interval').first()
             if not config:
-                config = SystemConfig(key='update_interval', value=str(minutes))
+                config = SystemConfig(key='update_interval', value=str(seconds))
                 session.add(config)
             else:
-                config.value = str(minutes)
+                config.value = str(seconds)
             session.commit()
         finally:
             session.close()
             
-        return True, f"已调整更新频率为 {minutes} 分钟/次"
+        return True, f"已调整更新频率为 {seconds} 秒/次"
     except Exception as e:
         return False, str(e)

@@ -107,7 +107,8 @@ def refresh_fund_holdings():
             return jsonify({'success': False, 'message': '未找到该基金'})
             
         # 重新获取数据
-        print(f"正在重新获取基金 {fund.code} 的持仓...")
+        from log_utils import log
+        log(f"正在重新获取基金 {fund.code} 的持仓...")
         data = FundFetcher.get_fund_details(fund.code)
         if not data:
             return jsonify({'success': False, 'message': '无法从外部接口获取数据'})
@@ -294,10 +295,13 @@ def get_config():
     session = get_session()
     try:
         config = session.query(models.SystemConfig).filter_by(key='update_interval').first()
-        interval = 5
+        interval = 60
         if config:
             try:
-                interval = int(config.value)
+                val = int(config.value)
+                if val < 30:
+                    val = val * 60
+                interval = val
             except: pass
         return jsonify({'success': True, 'data': {'interval': interval}})
     except Exception as e:
@@ -307,13 +311,13 @@ def get_config():
 
 @app.route('/api/config/update', methods=['POST'])
 def update_config():
-    minutes = request.json.get('interval')
-    if not minutes or int(minutes) < 1:
-        return jsonify({'success': False, 'message': '间隔必须大于等于1分钟'})
+    seconds = request.json.get('interval')
+    if not seconds or int(seconds) < 30:
+        return jsonify({'success': False, 'message': '间隔必须大于等于30秒'})
         
     from scheduler_service import change_interval
     try:
-        success, msg = change_interval(int(minutes))
+        success, msg = change_interval(int(seconds))
         return jsonify({'success': success, 'message': msg})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})

@@ -495,7 +495,7 @@
                         - <b>实时股价</b>：来自新浪财经 (High Frequency Interface)，每5分钟更新一次。</p>
 
                     <p><strong style="color: var(--text-main)">3. 更新机制</strong><br>
-                        - <b>交易时间</b>：9:30~11:30, 13:00~15:00，每5分钟自动计算一次。<br>
+                        - <b>交易时间</b>：9:30~11:30, 13:00~15:00，系统自动周期更新。<br>
                         - <b>收盘补全</b>：15:00 后会自动检查并补全当天的收盘数据。<br>
                         - <b>手动触发</b>：点击“立即触发后端计算”可强制立即运行一次计算逻辑。</p>
 
@@ -592,14 +592,14 @@
                 <div class="modal-body" style="display: block;">
                     <div style="margin-bottom: 20px;">
                         <label style="display: block; margin-bottom: 10px; color: var(--text-sub);">
-                            自动更新间隔 (分钟)
+                            自动更新间隔 (秒)
                         </label>
                         <div class="input-group" style="width: 100%; box-sizing: border-box;">
-                            <input type="number" v-model="config.interval" min="1" style="flex: 1;">
+                            <input type="number" v-model="config.interval" min="30" style="flex: 1;">
                             <button @click="saveConfig">保存生效</button>
                         </div>
                         <p style="font-size: 12px; color: var(--gray); margin-top: 8px;">
-                            最小为 1 分钟。修改后后端定时任务将立即重启。
+                            最小为 30 秒。修改后后端定时任务将立即重启。
                         </p>
                     </div>
                 </div>
@@ -629,7 +629,7 @@
                 // Config
                 showSettingsModal: false,
                 config: {
-                    interval: 5
+                    interval: 60
                 },
 
                 // Chart & Detail Data
@@ -654,7 +654,7 @@
             },
             mounted() {
                 this.fetchList();
-                setInterval(this.fetchList, 60000);
+                setInterval(this.fetchList, 30000);
             },
             methods: {
                 fetchList() {
